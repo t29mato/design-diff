@@ -1,8 +1,15 @@
-"""MermaidRenderer のテスト。architecture.md §7。
+"""MermaidRenderer のテスト。architecture.md §7 + HQフィードバック(表示品質)。
+
+合格基準(HQ): design-diff自身を解析した図をGitHubのMermaidプレビューに貼り、
+スクロールせずに「何が増え、何が消え、何が変わり、どの依存が生えたか」が
+一目で分かること。そのために:
 
 - 3状態(追加/削除/変更)をclassDefで色分け
+- 完全修飾名(fqn)をそのままラベルにしない。短い名前 + namespace記法でグループ化
+  (fqnはノードIDとしてのみ使い、表示ラベルは短縮する)
 - 変更のないクラスは出さない(ノイズ削減)
-- リレーションはpy2puml/PlantUML互換の記法(*--, <|--)にマッピング
+- 変更クラス数が上限を超えたら、影響度の大きい上位N件だけを図示し、
+  残りは診断的な note(純粋なMermaid構文。SVG変換にも耐える)で要約する
 """
 
 from design_diff.adapters.rendering.mermaid_renderer import MermaidRenderer
@@ -40,28 +47,80 @@ class TestMermaidRendererStructure:
         assert output.startswith("classDiagram")
 
 
-class TestMermaidRendererAddedRemoved:
-    def test_renders_added_class_with_added_style(self):
-        added = make_class("pkg.Battery", attributes=(AttributeIR(name="capacity_kwh", type="float"),))
+class TestMermaidRendererLabelsAndNamespaces:
+    """HQフィードバック優先度3: ラベル短縮 + namespace記法によるグループ化。"""
+
+    def test_uses_short_class_name_as_the_visible_label(self):
+        added = make_class(
+            "shop.domain.models.Product",
+            attributes=(AttributeIR(name="price", type="float"),),
+        )
         diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
 
         output = MermaidRenderer().render(diff)
 
-        assert "class `pkg.Battery`:::added" in output
+        assert '["Product"]' in output
+        assert "shop.domain.models.Product" not in output  # fqnそのままはラベルに出さない
+
+    def test_groups_classes_by_module_path_using_namespace_syntax(self):
+        added = make_class("shop.domain.models.Product")
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "namespace shop.domain.models {" in output
+
+    def test_relation_lines_reference_sanitized_ids_not_raw_fqn(self):
+        relation = RelationIR(
+            source_fqn="shop.domain.models.Car", target_fqn="shop.domain.models.Battery",
+            type=RelationType.COMPOSITION,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
+
+        output = MermaidRenderer().render(diff)
+
+        assert "shop_domain_models_Car *-- shop_domain_models_Battery" in output
+        # バッククォート付きの生fqnはノードIDとして使わない(可読性のため)
+        assert "`shop.domain.models.Car`" not in output
+
+    def test_relation_endpoint_not_in_the_diff_is_declared_as_plain_context_node(self):
+        """変更されていないクラスへのリレーションでも、参照先を短いラベルで宣言する。"""
+        relation = RelationIR(
+            source_fqn="shop.domain.models.Car", target_fqn="shop.domain.models.Engine",
+            type=RelationType.COMPOSITION,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
+
+        output = MermaidRenderer().render(diff)
+
+        assert '["Engine"]' in output
+        assert ":::added" not in output.split('["Engine"]')[0].splitlines()[-1]
+
+
+class TestMermaidRendererAddedRemoved:
+    def test_renders_added_class_with_added_style(self):
+        added = make_class("pkg.models.Battery", attributes=(AttributeIR(name="capacity_kwh", type="float"),))
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert ':::added' in output
+        assert '["Battery"]' in output
         assert "capacity_kwh" in output
         assert "float" in output
 
     def test_renders_removed_class_with_removed_style(self):
-        removed = make_class("pkg.Wheel", attributes=(AttributeIR(name="diameter", type="float"),))
+        removed = make_class("pkg.models.Wheel", attributes=(AttributeIR(name="diameter", type="float"),))
         diff = SnapshotDiff(classes=ClassDiff(removed=(removed,)), relations=RelationDiff())
 
         output = MermaidRenderer().render(diff)
 
-        assert "class `pkg.Wheel`:::removed" in output
+        assert ':::removed' in output
+        assert '["Wheel"]' in output
 
     def test_renders_methods_with_parameters_and_return_type(self):
         added = make_class(
-            "pkg.Car",
+            "pkg.models.Car",
             methods=(MethodIR(name="honk", parameters=(), return_type="None"),),
         )
         diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
@@ -74,10 +133,10 @@ class TestMermaidRendererAddedRemoved:
 
 class TestMermaidRendererModified:
     def test_renders_modified_class_with_modified_style_and_note(self):
-        base_car = make_class("pkg.Car", attributes=(AttributeIR(name="wheels", type="List[Wheel]"),))
-        head_car = make_class("pkg.Car", attributes=(AttributeIR(name="battery", type="Battery"),))
+        base_car = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="List[Wheel]"),))
+        head_car = make_class("pkg.models.Car", attributes=(AttributeIR(name="battery", type="Battery"),))
         mod = ClassModification(
-            fqn="pkg.Car",
+            fqn="pkg.models.Car",
             name="Car",
             attributes=AttributeDiff(
                 added=(AttributeIR(name="battery", type="Battery"),),
@@ -91,46 +150,126 @@ class TestMermaidRendererModified:
 
         output = MermaidRenderer().render(diff)
 
-        assert "class `pkg.Car`:::modified" in output
+        assert ':::modified' in output
+        assert '["Car"]' in output
         assert "battery" in output  # head時点の属性を表示
-        assert "note for `pkg.Car`" in output
+        assert "note for pkg_models_Car" in output
         assert "+ battery" in output  # noteの中に差分サマリ
         assert "- wheels" in output
 
 
 class TestMermaidRendererUnchanged:
     def test_unchanged_classes_are_not_part_of_the_diff_and_produce_no_extra_class_block(self):
-        # SnapshotDiffには変更のあったクラスしか入ってこない前提(DiffEngineの沈黙原則)。
-        # レンダラー側は空のClassDiffに対して余計なclassブロックを出さないことだけを保証する。
         output = MermaidRenderer().render(EMPTY_DIFF)
-        assert "class `" not in output
+        assert '["' not in output
 
 
 class TestMermaidRendererRelations:
     def test_renders_added_composition(self):
-        relation = RelationIR(source_fqn="pkg.Car", target_fqn="pkg.Battery", type=RelationType.COMPOSITION)
+        relation = RelationIR(
+            source_fqn="pkg.models.Car",
+            target_fqn="pkg.models.Battery",
+            type=RelationType.COMPOSITION,
+        )
         diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
 
         output = MermaidRenderer().render(diff)
 
-        assert "`pkg.Car` *-- `pkg.Battery`" in output
+        assert "pkg_models_Car *-- pkg_models_Battery" in output
 
     def test_renders_added_inheritance(self):
-        relation = RelationIR(source_fqn="pkg.Vehicle", target_fqn="pkg.Car", type=RelationType.INHERITANCE)
+        relation = RelationIR(
+            source_fqn="pkg.models.Vehicle",
+            target_fqn="pkg.models.Car",
+            type=RelationType.INHERITANCE,
+        )
         diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
 
         output = MermaidRenderer().render(diff)
 
-        assert "`pkg.Vehicle` <|-- `pkg.Car`" in output
+        assert "pkg_models_Vehicle <|-- pkg_models_Car" in output
 
     def test_marks_removed_relations_distinctly_from_added(self):
-        added = RelationIR(source_fqn="pkg.Car", target_fqn="pkg.Battery", type=RelationType.COMPOSITION)
-        removed = RelationIR(source_fqn="pkg.Car", target_fqn="pkg.Wheel", type=RelationType.COMPOSITION)
+        added = RelationIR(
+            source_fqn="pkg.models.Car",
+            target_fqn="pkg.models.Battery",
+            type=RelationType.COMPOSITION,
+        )
+        removed = RelationIR(
+            source_fqn="pkg.models.Car",
+            target_fqn="pkg.models.Wheel",
+            type=RelationType.COMPOSITION,
+        )
         diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(added,), removed=(removed,)))
 
         output = MermaidRenderer().render(diff)
 
-        added_line = next(line for line in output.splitlines() if "pkg.Battery" in line)
-        removed_line = next(line for line in output.splitlines() if "pkg.Wheel" in line)
+        added_line = next(line for line in output.splitlines() if "Battery" in line and "*--" in line)
+        removed_line = next(line for line in output.splitlines() if "Wheel" in line and "*--" in line)
         assert added_line != removed_line
-        assert "removed" in removed_line or "%% removed" in output
+        assert "removed" in removed_line
+
+
+class TestMermaidRendererSizeCap:
+    """HQ追加要件: 図のサイズ制御。変更クラス数が上限を超えたら上位N件のみ図示。"""
+
+    def _make_many_added_classes(self, count: int) -> tuple[ClassIR, ...]:
+        return tuple(
+            make_class(f"pkg.models.Class{i}", attributes=(AttributeIR(name="x", type="int"),))
+            for i in range(count)
+        )
+
+    def test_renders_all_classes_when_under_the_cap(self):
+        added = self._make_many_added_classes(5)
+        diff = SnapshotDiff(classes=ClassDiff(added=added), relations=RelationDiff())
+
+        output = MermaidRenderer(max_classes=20).render(diff)
+
+        for cls in added:
+            assert f'["{cls.name}"]' in output
+
+    def test_caps_the_number_of_rendered_classes_when_over_the_limit(self):
+        added = self._make_many_added_classes(25)
+        diff = SnapshotDiff(classes=ClassDiff(added=added), relations=RelationDiff())
+
+        output = MermaidRenderer(max_classes=20).render(diff)
+
+        rendered_count = sum(1 for cls in added if f'["{cls.name}"]' in output)
+        assert rendered_count == 20
+
+    def test_adds_a_summary_note_when_capped(self):
+        added = self._make_many_added_classes(25)
+        diff = SnapshotDiff(classes=ClassDiff(added=added), relations=RelationDiff())
+
+        output = MermaidRenderer(max_classes=20).render(diff)
+
+        assert 'note "' in output
+        assert "25" in output  # 変更クラス総数への言及
+        assert "20" in output  # 表示件数への言及
+
+    def test_prioritizes_classes_with_larger_diffs_when_capped(self):
+        small = make_class("pkg.models.Small", attributes=(AttributeIR(name="a", type="int"),))
+        big = make_class(
+            "pkg.models.Big",
+            attributes=tuple(AttributeIR(name=f"f{i}", type="int") for i in range(10)),
+        )
+        filler = self._make_many_added_classes(20)
+        diff = SnapshotDiff(classes=ClassDiff(added=(small, big, *filler)), relations=RelationDiff())
+
+        output = MermaidRenderer(max_classes=1).render(diff)
+
+        assert '["Big"]' in output
+        assert '["Small"]' not in output
+
+    def test_output_remains_valid_standalone_mermaid_text_when_capped(self):
+        """要約は`note "..."` というMermaid標準構文で表現し、Markdown表などは混ぜない
+        (GitHubプレビューだけでなくSVG変換パイプラインにもそのまま渡せるようにするため)。
+        """
+        added = self._make_many_added_classes(25)
+        diff = SnapshotDiff(classes=ClassDiff(added=added), relations=RelationDiff())
+
+        output = MermaidRenderer(max_classes=20).render(diff)
+
+        assert "|" not in output.split("note")[0]  # Markdownテーブルの罫線が混じっていない
+        for line in output.splitlines():
+            assert not line.strip().startswith("#")  # Markdown見出しが混じっていない

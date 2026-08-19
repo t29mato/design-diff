@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from design_diff.adapters.rendering.svg_renderer import SvgRenderingUnavailableError
 from design_diff.application.use_cases.compute_design_diff import DesignDiffResult
 from design_diff.cli.main import main
 from design_diff.domain.diff import ClassDiff, RelationDiff, SnapshotDiff
@@ -76,6 +77,37 @@ class TestCliDiffCommandWiring:
         )
 
         assert received_repo_paths == [Path("/some/repo")]
+
+    def test_format_svg_prints_svg_produced_by_svg_renderer(self, capsys):
+        class FakeSvgRenderer:
+            def render(self, mermaid_text: str) -> str:
+                assert mermaid_text == CANNED_RESULT.mermaid
+                return "<svg>fake</svg>"
+
+        exit_code = main(
+            ["diff", "main", "feature", "--package", "pkg", "--format", "svg"],
+            use_case_factory=lambda repo_path: FakeUseCase(CANNED_RESULT),
+            svg_renderer_factory=FakeSvgRenderer,
+        )
+
+        captured = capsys.readouterr()
+        assert exit_code == 0
+        assert captured.out.strip() == "<svg>fake</svg>"
+
+    def test_format_svg_prints_actionable_error_and_exits_nonzero_when_unavailable(self, capsys):
+        class UnavailableSvgRenderer:
+            def render(self, mermaid_text: str) -> str:
+                raise SvgRenderingUnavailableError("mermaid-cliが見つかりません。npm install ...")
+
+        exit_code = main(
+            ["diff", "main", "feature", "--package", "pkg", "--format", "svg"],
+            use_case_factory=lambda repo_path: FakeUseCase(CANNED_RESULT),
+            svg_renderer_factory=UnavailableSvgRenderer,
+        )
+
+        captured = capsys.readouterr()
+        assert exit_code == 1
+        assert "npm install" in captured.err
 
     def test_include_dunder_flag_defaults_to_false(self, capsys):
         fake_use_case = FakeUseCase(CANNED_RESULT)
@@ -179,5 +211,6 @@ class TestCliEndToEnd:
         )
 
         captured = capsys.readouterr()
-        assert "cli_e2e_pkg.models.Car" in captured.out
-        assert ":::added" in captured.out
+        # fqnそのものではなく短いラベル + namespace記法で出力される(HQフィードバック)
+        assert 'class cli_e2e_pkg_models_Car["Car"]:::added' in captured.out
+        assert "namespace cli_e2e_pkg.models {" in captured.out

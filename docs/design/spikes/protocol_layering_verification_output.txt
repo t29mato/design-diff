@@ -1,0 +1,2 @@
+戻り値: {'path': 'p', 'package': 'pkg'}
+isinstance(Py2pumlExtractor(), ExtractorPort) = True (importなしでも構造的部分型として認識される)

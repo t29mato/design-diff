@@ -1,0 +1,23 @@
+version = 1
+revision = 3
+requires-python = ">=3.12"
+
+[[package]]
+name = "design-diff"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "py2puml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "py2puml", specifier = ">=0.11.0" }]
+
+[[package]]
+name = "py2puml"
+version = "0.11.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/87/65/51eb076157c34ca7686726c45a92da1bc2cb72e8d95c292f4cb86f0982ab/py2puml-0.11.0.tar.gz", hash = "sha256:a08ce1988e163ebcb9e0f2fbc6e6b1251e0abd1f9cf1f2e32a32744cb85a99ea", size = 19974, upload-time = "2026-02-18T13:20:57.835Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/87/15d07aabfbd2ff1e6836aa7871c675a1b709d85a1cb46342622efefebdf0/py2puml-0.11.0-py3-none-any.whl", hash = "sha256:a64689d149db7d6d3253a719be4050a2b4e2802758481bd0ca1da2400f8d9f49", size = 27092, upload-time = "2026-02-18T13:20:56.316Z" },
+]

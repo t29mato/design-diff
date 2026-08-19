@@ -1,0 +1,14 @@
+=== 検証1: ライブラリ組み込みで構造化データが取れるか ===
+sample.models.Engine -> UmlClass(name='Engine', fqn='sample.models.Engine', attributes=[UmlAttribute(name='horsepower', type='int', static=False)], is_abstract=False)
+sample.models.Wheel -> UmlClass(name='Wheel', fqn='sample.models.Wheel', attributes=[UmlAttribute(name='diameter', type='float', static=False)], is_abstract=False)
+sample.models.Vehicle -> UmlClass(name='Vehicle', fqn='sample.models.Vehicle', attributes=[UmlAttribute(name='name', type='str', static=False)], is_abstract=False)
+sample.models.Car -> UmlClass(name='Car', fqn='sample.models.Car', attributes=[UmlAttribute(name='engine', type='Engine', static=False), UmlAttribute(name='wheels', type='List[Wheel]', static=False), UmlAttribute(name='spare_wheel', type='Optional[Wheel]', static=False)], is_abstract=False)
+UmlRelation(source_fqn='sample.models.Car', target_fqn='sample.models.Engine', type=<RelType.COMPOSITION: '*'>)
+UmlRelation(source_fqn='sample.models.Car', target_fqn='sample.models.Wheel', type=<RelType.COMPOSITION: '*'>)
+UmlRelation(source_fqn='sample.models.Vehicle', target_fqn='sample.models.Car', type=<RelType.INHERITANCE: '<|'>)
+
+=== 検証2: 同一プロセスで base/head を連続 inspect すると衝突するか ===
+base に Car は含まれるか: False
+head に Car は含まれるか: False
+-> 'sample.models' という同一のモジュール名を同一プロセス内で複数回 import_module() すると、2回目以降は sys.modules のキャッシュが返る。 キャッシュされたモジュールの __file__ は最初に import した時点のパスのままなので、 後続の inspect が期待する root_domain_path と一致せずフィルタで除外され、 クラスが例外なく静かに消える(このスクリプトでは検証1が先に 'sample.models' を import 済みのため base の時点で既に汚染されている)。 => base/head の抽出は必ずプロセス分離(サブプロセスや別インタプリタ起動)して 行うこと。同一プロセス内での連続 inspect は不可。
+

@@ -6,6 +6,12 @@ architecture.md §5 の実測で確認した設計判断が実装でも守られ
          (サブプロセス分離のリグレッションテスト)
 - §5.4 / HQ指摘1: 継承メソッドを拾わないこと(実際のpy2puml実行を通して)
 
+さらに、design-diff自身をdesign-diffで解析する「ドッグフーディング」(CLAUDE.md)を
+実施した際に発見した回帰: src-layout(`src/<package>/...`)のリポジトリでは
+`root / package` にパッケージが存在せず、`root / "src" / package` を見なければ
+ならない。これを見落とすと「例外なく0クラス」という無言の失敗になる(§5.2の
+symlink罠と同種の『無言で消える』クラスの罠)。
+
 テストごとに package 名を変えて、pytest プロセス内でのimportキャッシュ汚染を避ける
 (design_diffプロセス自体はテスト間で共有されるため)。
 """
@@ -134,6 +140,24 @@ class TestPy2pumlExtractorBasics:
         snapshot = Py2pumlExtractor().extract(symlinked_root, package)
 
         assert f"{package}.models.Car" in snapshot.classes
+
+
+class TestPy2pumlExtractorSrcLayout:
+    def test_extracts_classes_when_package_lives_under_src(self, tmp_path):
+        """ドッグフーディング(CLAUDE.md)で発見した回帰テスト。
+
+        design-diff自身のリポジトリのようにsrc-layout(`src/<package>/...`)の場合、
+        `root / package` にはパッケージが存在しない。これを見落とすと py2puml の
+        Inspector が root_domain_path を見つけられず、例外なく0クラスという
+        『無言の失敗』になる(§5.2のsymlink罠と同種)。
+        """
+        package = "extractor_src_layout_pkg"
+        write_package(tmp_path / "src", package, CAR_V1)
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package)
+
+        assert f"{package}.models.Car" in snapshot.classes
+        assert f"{package}.models.Engine" in snapshot.classes
 
 
 class TestPy2pumlExtractorProcessIsolation:

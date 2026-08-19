@@ -77,9 +77,17 @@ def class_object_for_fqn(fqn: str) -> type:
 def extract_snapshot(root: Path, package: str) -> dict:
     # 罠1対策: symlink未解決だと対象クラスが無言で消える(architecture.md §5.2)。
     resolved_root = root.resolve()
-    package_path = resolved_root
-    for part in package.split("."):
-        package_path = package_path / part
+    package_parts = package.split(".")
+
+    # ドッグフーディングで発見した回帰(design-diff自身がsrc-layout):
+    # `root / package` にパッケージが存在しない場合、`root / "src" / package` も試す。
+    # どちらにも無ければ(存在しないパスのまま)Inspectorに渡し、Inspector自身の
+    # フォールバック(モジュールとしてのimport)に委ねる。
+    candidate = resolved_root.joinpath(*package_parts)
+    src_candidate = resolved_root.joinpath("src", *package_parts)
+    if not candidate.is_dir() and src_candidate.is_dir():
+        candidate = src_candidate
+    package_path = candidate
 
     inspection = Inspection({}, [])
     list(Inspector(resolved_root, package_path, package).inspect(inspection))

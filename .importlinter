@@ -1,0 +1,48 @@
+[importlinter]
+root_package = design_diff
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = レイヤー依存方向の強制(4層)
+type = layers
+layers =
+    design_diff.cli | design_diff.action
+    design_diff.application
+    design_diff.adapters
+    design_diff.domain
+
+[importlinter:contract:domain-purity]
+name = ドメイン層は誰にも依存しない
+type = forbidden
+source_modules =
+    design_diff.domain
+forbidden_modules =
+    py2puml
+    git
+    github
+    subprocess
+    design_diff.application
+    design_diff.adapters
+    design_diff.cli
+    design_diff.action
+
+[importlinter:contract:application-purity]
+name = application層はdomainのみに依存し、adaptersの具象実装をimportしない(DIPの機械的強制)
+type = forbidden
+source_modules =
+    design_diff.application
+forbidden_modules =
+    py2puml
+    git
+    github
+    design_diff.adapters
+    design_diff.cli
+    design_diff.action
+
+[importlinter:contract:adapters-independence]
+name = アダプタ同士は互いに依存しない(extraction/vcs/rendering/githubは独立)
+type = independence
+modules =
+    design_diff.adapters.extraction
+    design_diff.adapters.vcs
+    design_diff.adapters.rendering

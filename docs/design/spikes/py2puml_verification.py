@@ -18,7 +18,6 @@
 
 from __future__ import annotations
 
-import shutil
 import tempfile
 from pathlib import Path
 
@@ -139,7 +138,10 @@ def verify_same_process_collision() -> None:
         print("base に Car は含まれるか:", "sample.models.Car" in insp_base.items_by_fqn)
         print("head に Car は含まれるか:", "sample.models.Car" in insp_head.items_by_fqn)
 
-        if "sample.models.Car" not in insp_head.items_by_fqn or "sample.models.Car" not in insp_base.items_by_fqn:
+        if (
+            "sample.models.Car" not in insp_head.items_by_fqn
+            or "sample.models.Car" not in insp_base.items_by_fqn
+        ):
             print(
                 "-> 'sample.models' という同一のモジュール名を同一プロセス内で複数回"
                 " import_module() すると、2回目以降は sys.modules のキャッシュが返る。"

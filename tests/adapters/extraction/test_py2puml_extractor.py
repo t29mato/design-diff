@@ -116,7 +116,11 @@ class TestPy2pumlExtractorBasics:
         ]
 
     def test_own_methods_only_car_does_not_include_inherited_drive(self, tmp_path):
-        """HQ指摘1回帰テスト(実プロセス経由)。"""
+        """HQ指摘1回帰テスト(実プロセス経由)。
+
+        既定ではダンダーメソッド(__init__含む)も除外される
+        (HQフィードバック優先度1)。
+        """
         package = "extractor_methods_pkg"
         write_package(tmp_path, package, CAR_V1)
 
@@ -124,8 +128,33 @@ class TestPy2pumlExtractorBasics:
 
         car = snapshot.classes[f"{package}.models.Car"]
         method_names = {m.name for m in car.methods}
-        assert method_names == {"__init__", "honk"}
+        assert method_names == {"honk"}
         assert "drive" not in method_names
+
+    def test_include_dunder_opt_in_brings_back_init(self, tmp_path):
+        package = "extractor_include_dunder_pkg"
+        write_package(tmp_path, package, CAR_V1)
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package, include_dunder=True)
+
+        car = snapshot.classes[f"{package}.models.Car"]
+        method_names = {m.name for m in car.methods}
+        assert "__init__" in method_names
+        assert "honk" in method_names
+
+    def test_attribute_types_are_formatted_cleanly(self, tmp_path):
+        """HQフィードバック優先度2の回帰テスト(実プロセス経由)。"""
+        package = "extractor_type_format_pkg"
+        write_package(tmp_path, package, CAR_V1)
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package)
+
+        car = snapshot.classes[f"{package}.models.Car"]
+        types_by_name = {a.name: a.type for a in car.attributes}
+        assert types_by_name["engine"] == "Engine"
+        assert types_by_name["wheels"] == "List[Wheel]"
+        assert "<class" not in types_by_name["engine"]
+        assert "typing." not in types_by_name["wheels"]
 
     def test_works_when_root_path_contains_unresolved_symlink(self, tmp_path):
         """§5.2の回帰テスト: symlink未解決パスでもクラスが消えないこと。"""

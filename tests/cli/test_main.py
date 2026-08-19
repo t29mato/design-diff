@@ -20,8 +20,10 @@ class FakeUseCase:
         self._result = result
         self.calls: list[tuple] = []
 
-    def execute(self, base_ref: str, head_ref: str, package: str) -> DesignDiffResult:
-        self.calls.append((base_ref, head_ref, package))
+    def execute(
+        self, base_ref: str, head_ref: str, package: str, *, include_dunder: bool = False
+    ) -> DesignDiffResult:
+        self.calls.append((base_ref, head_ref, package, include_dunder))
         return self._result
 
 
@@ -44,7 +46,7 @@ class TestCliDiffCommandWiring:
         captured = capsys.readouterr()
         assert exit_code == 0
         assert captured.out.strip() == CANNED_RESULT.mermaid
-        assert fake_use_case.calls == [("main", "feature", "pkg")]
+        assert fake_use_case.calls == [("main", "feature", "pkg", False)]
 
     def test_prints_json_when_format_json(self, capsys):
         fake_use_case = FakeUseCase(CANNED_RESULT)
@@ -74,6 +76,26 @@ class TestCliDiffCommandWiring:
         )
 
         assert received_repo_paths == [Path("/some/repo")]
+
+    def test_include_dunder_flag_defaults_to_false(self, capsys):
+        fake_use_case = FakeUseCase(CANNED_RESULT)
+
+        main(
+            ["diff", "main", "feature", "--package", "pkg"],
+            use_case_factory=lambda repo_path: fake_use_case,
+        )
+
+        assert fake_use_case.calls[0][3] is False
+
+    def test_include_dunder_flag_can_be_enabled(self, capsys):
+        fake_use_case = FakeUseCase(CANNED_RESULT)
+
+        main(
+            ["diff", "main", "feature", "--package", "pkg", "--include-dunder"],
+            use_case_factory=lambda repo_path: fake_use_case,
+        )
+
+        assert fake_use_case.calls[0][3] is True
 
 
 def run_git(repo: Path, *args: str) -> None:

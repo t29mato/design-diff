@@ -45,6 +45,11 @@ def _build_parser() -> argparse.ArgumentParser:
     diff_parser.add_argument(
         "--repo", type=Path, default=None, help="対象gitリポジトリのパス(既定: カレントディレクトリ)"
     )
+    diff_parser.add_argument(
+        "--include-dunder",
+        action="store_true",
+        help="ダンダーメソッド(__init__等)も含める(既定: 除外。表示ノイズ削減のため)",
+    )
 
     return parser
 
@@ -55,7 +60,12 @@ def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _defa
 
     if args.command == "diff":
         use_case = use_case_factory(args.repo)
-        result = use_case.execute(base_ref=args.base_ref, head_ref=args.head_ref, package=args.package)
+        result = use_case.execute(
+            base_ref=args.base_ref,
+            head_ref=args.head_ref,
+            package=args.package,
+            include_dunder=args.include_dunder,
+        )
         output = result.json_payload if args.format == "json" else result.mermaid
         print(output)
         return 0

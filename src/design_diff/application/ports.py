@@ -34,7 +34,14 @@ class ExtractorPort(Protocol):
     base/headの2回呼び出しは呼び出し元(ComputeDesignDiffUseCase)が行う。
     """
 
-    def extract(self, path: Path, package: str) -> SnapshotIR: ...
+    def extract(self, path: Path, package: str, *, include_dunder: bool = False) -> SnapshotIR:
+        """SnapshotIRを抽出する。
+
+        `include_dunder=False`(既定)ではダンダーメソッド(`__init__`等)を除外する
+        (HQフィードバック: 表示品質。dataclass自動生成やProtocolのノイズ、
+        属性差分との二重計上を防ぐ)。
+        """
+        ...
 
 
 class RendererPort(Protocol):

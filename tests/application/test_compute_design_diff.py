@@ -35,9 +35,11 @@ class FakeExtractor:
     def __init__(self, snapshots_by_path: dict[str, SnapshotIR]):
         self._snapshots_by_path = snapshots_by_path
         self.extracted_paths: list[Path] = []
+        self.include_dunder_calls: list[bool] = []
 
-    def extract(self, path: Path, package: str) -> SnapshotIR:
+    def extract(self, path: Path, package: str, *, include_dunder: bool = False) -> SnapshotIR:
         self.extracted_paths.append(path)
+        self.include_dunder_calls.append(include_dunder)
         return self._snapshots_by_path[str(path)]
 
 
@@ -106,7 +108,7 @@ class TestComputeDesignDiffUseCase:
         vcs = FakeVcs()
 
         class FailingExtractor:
-            def extract(self, path: Path, package: str) -> SnapshotIR:
+            def extract(self, path: Path, package: str, *, include_dunder: bool = False) -> SnapshotIR:
                 raise RuntimeError("boom")
 
         use_case = ComputeDesignDiffUseCase(
@@ -183,6 +185,44 @@ class TestComputeDesignDiffUseCase:
         expected_meta = {"package": "pkg", "base_ref": "main", "head_ref": "feature"}
         assert mermaid_renderer.calls[0][2] == expected_meta
         assert json_renderer.calls[0][2] == expected_meta
+
+    def test_include_dunder_defaults_to_false_and_is_passed_to_extractor(self):
+        vcs = FakeVcs()
+        extractor = FakeExtractor(
+            {
+                "/fake/worktree/main": empty_snapshot("pkg"),
+                "/fake/worktree/feature": empty_snapshot("pkg"),
+            }
+        )
+        use_case = ComputeDesignDiffUseCase(
+            vcs=vcs,
+            extractor=extractor,
+            mermaid_renderer=FakeRenderer("mermaid"),
+            json_renderer=FakeRenderer("json"),
+        )
+
+        use_case.execute(base_ref="main", head_ref="feature", package="pkg")
+
+        assert extractor.include_dunder_calls == [False, False]
+
+    def test_include_dunder_true_is_passed_through_to_both_extract_calls(self):
+        vcs = FakeVcs()
+        extractor = FakeExtractor(
+            {
+                "/fake/worktree/main": empty_snapshot("pkg"),
+                "/fake/worktree/feature": empty_snapshot("pkg"),
+            }
+        )
+        use_case = ComputeDesignDiffUseCase(
+            vcs=vcs,
+            extractor=extractor,
+            mermaid_renderer=FakeRenderer("mermaid"),
+            json_renderer=FakeRenderer("json"),
+        )
+
+        use_case.execute(base_ref="main", head_ref="feature", package="pkg", include_dunder=True)
+
+        assert extractor.include_dunder_calls == [True, True]
 
     def test_uses_injected_diff_engine_when_provided(self):
         vcs = FakeVcs()

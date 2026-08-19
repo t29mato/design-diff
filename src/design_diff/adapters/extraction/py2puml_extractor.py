@@ -37,12 +37,11 @@ class Py2pumlExtractionError(RuntimeError):
 
 
 class Py2pumlExtractor:
-    def extract(self, path: Path, package: str) -> SnapshotIR:
-        result = subprocess.run(
-            [sys.executable, str(_WORKER_SCRIPT), str(path), package],
-            capture_output=True,
-            text=True,
-        )
+    def extract(self, path: Path, package: str, *, include_dunder: bool = False) -> SnapshotIR:
+        args = [sys.executable, str(_WORKER_SCRIPT), str(path), package]
+        if include_dunder:
+            args.append("--include-dunder")
+        result = subprocess.run(args, capture_output=True, text=True)
         if result.returncode != 0:
             raise Py2pumlExtractionError(
                 f"py2puml worker failed for path={path} package={package}: {result.stderr.strip()}"

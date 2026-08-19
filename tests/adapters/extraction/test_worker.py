@@ -14,7 +14,7 @@ HQ指摘1の回帰テスト(architecture.md §5.4)を含む:
 
 import typing
 
-from design_diff.adapters.extraction._worker import own_methods
+from design_diff.adapters.extraction._worker import format_type, own_methods
 
 
 class Vehicle:
@@ -67,7 +67,7 @@ class TestOwnMethods:
         methods = own_methods(Car)
         honk = next(m for m in methods if m["name"] == "honk")
         param_names = [p["name"] for p in honk["parameters"]]
-        assert param_names == ["self", "times"]
+        assert param_names == ["times"]  # self は表示ノイズのため除外(下記テスト参照)
         assert honk["return_type"] == "None"
 
     def test_includes_staticmethod(self):
@@ -115,6 +115,36 @@ class TestOwnMethodsDunderExclusion:
         assert "__init__" not in names
 
 
+class TestOwnMethodsSelfClsStripping:
+    """ドッグフーディングで発見した表示ノイズ: 全メソッドに`self`が並び冗長。
+
+    self/clsは全インスタンス/クラスメソッドに機械的に付くだけで情報量がないため、
+    UMLの慣習に合わせて表示から除く(JSON側の忠実性より、図の可読性を優先)。
+    """
+
+    def test_strips_self_from_instance_methods(self):
+        methods = own_methods(Car)
+        honk = next(m for m in methods if m["name"] == "honk")
+        assert [p["name"] for p in honk["parameters"]] == ["times"]
+
+    def test_strips_cls_from_classmethods(self):
+        methods = own_methods(Car)
+        from_name = next(m for m in methods if m["name"] == "from_name")
+        assert [p["name"] for p in from_name["parameters"]] == ["name"]
+
+    def test_does_not_strip_parameters_from_staticmethods(self):
+        """staticmethodにはself/clsが元々付かないため、全パラメータをそのまま残す。"""
+
+        class Sample:
+            @staticmethod
+            def add(a: int, b: int) -> int:
+                return a + b
+
+        methods = own_methods(Sample)
+        add = methods[0]
+        assert [p["name"] for p in add["parameters"]] == ["a", "b"]
+
+
 class TestOwnMethodsTypeFormatting:
     """HQフィードバック優先度2: 型表記の正規化。
 
@@ -128,6 +158,12 @@ class TestOwnMethodsTypeFormatting:
         price_param = next(p for p in method["parameters"] if p["name"] == "price")
         assert price_param["type"] == "float"
         assert method["return_type"] == "bool"
+
+    def test_format_type_passes_through_none_without_crashing(self):
+        """ドッグフーディングで発見した回帰: py2pumlがUmlAttribute.type=Noneを返す
+        ケースがあり、format_type(None)がTypeErrorでクラッシュしていた。
+        """
+        assert format_type(None) is None
 
     def test_strips_module_qualifiers_from_generic_types(self):
         methods = own_methods(ProductLister)

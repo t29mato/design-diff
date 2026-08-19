@@ -42,14 +42,19 @@ _CLASS_REPR_RE = re.compile(r"<(?:class|enum) '([\w.]+)'>")
 _DOTTED_NAME_RE = re.compile(r"\b(?:[A-Za-z_][\w]*\.)+([A-Za-z_]\w*)\b")
 
 
-def format_type(raw: str) -> str:
+def format_type(raw: str | None) -> str | None:
     """型の生repr文字列を、モジュール修飾を剥がした読める形に正規化する。
 
     例:
         "<class 'float'>"                              -> "float"
         "typing.List[shop.models.Product]"              -> "List[Product]"
         "typing.Optional[shop.models.Product]"           -> "Optional[Product]"
+
+    ドッグフーディングで発見した回帰: py2pumlはUmlAttribute.typeとしてNoneを返す
+    ケースがある(型が解決できない属性など)。Noneはそのまま素通りさせる。
     """
+    if raw is None:
+        return None
     text = _CLASS_REPR_RE.sub(lambda m: m.group(1), raw)
     text = text.replace("typing.", "")
     text = _DOTTED_NAME_RE.sub(lambda m: m.group(1), text)
@@ -72,12 +77,17 @@ def own_methods(cls: type, *, include_dunder: bool = False) -> list[dict]:
         if not include_dunder and _DUNDER_RE.match(name):
             continue
 
+        # self/clsは表示ノイズのため除外する(全メソッドに機械的に付くだけで情報量がない。
+        # ドッグフーディングで発見)。staticmethodには元々self/clsが付かないため対象外。
+        skip_first_param = 0
         if isinstance(obj, staticmethod):
             fn = obj.__func__
         elif isinstance(obj, classmethod):
             fn = obj.__func__
+            skip_first_param = 1  # cls
         elif inspect.isfunction(obj):
             fn = obj
+            skip_first_param = 1  # self
         else:
             continue  # プロパティ・クラス変数などは対象外(属性側で別途扱う)
 
@@ -93,7 +103,7 @@ def own_methods(cls: type, *, include_dunder: bool = False) -> list[dict]:
                 "name": param.name,
                 "type": None if param.annotation is empty_param else format_type(str(param.annotation)),
             }
-            for param in signature.parameters.values()
+            for param in list(signature.parameters.values())[skip_first_param:]
         ]
         empty = inspect.Signature.empty
         return_type = (

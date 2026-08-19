@@ -21,6 +21,16 @@ from design_diff.domain.model import (
     SnapshotIR,
 )
 
+# ドッグフーディングで発見した回帰: `python -m design_diff.adapters.extraction._worker`
+# で起動すると、起動そのものがツール自身のパッケージ`design_diff`を先にimportしてしまう。
+# 解析対象がたまたま`design_diff`という名前(=自分自身)だと、Inspectorが対象ファイルを
+# importする際にsys.modulesに載っている「ツール自身のdesign_diff」を再利用してしまい、
+# 対象ワークツリーのクラスが例外なく0件になる。
+# 対策: `-m <dotted module>`ではなくワーカーの.pyをファイルパスで直接起動する。
+# _worker.py自身はdesign_diffパッケージを一切importしないため、これで起動時の
+# design_diff importが完全になくなり、対象パッケージが何であっても衝突しない。
+_WORKER_SCRIPT = Path(__file__).parent / "_worker.py"
+
 
 class Py2pumlExtractionError(RuntimeError):
     """ワーカーサブプロセスの実行に失敗した場合。"""
@@ -29,7 +39,7 @@ class Py2pumlExtractionError(RuntimeError):
 class Py2pumlExtractor:
     def extract(self, path: Path, package: str) -> SnapshotIR:
         result = subprocess.run(
-            [sys.executable, "-m", "design_diff.adapters.extraction._worker", str(path), package],
+            [sys.executable, str(_WORKER_SCRIPT), str(path), package],
             capture_output=True,
             text=True,
         )

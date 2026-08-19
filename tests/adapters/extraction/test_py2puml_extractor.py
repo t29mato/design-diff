@@ -141,6 +141,29 @@ class TestPy2pumlExtractorBasics:
 
         assert f"{package}.models.Car" in snapshot.classes
 
+    def test_analyzing_a_package_literally_named_design_diff_does_not_collide_with_the_tool_itself(
+        self, tmp_path
+    ):
+        """ドッグフーディング(design-diff自身にdesign-diffを掛ける)で発見した回帰テスト。
+
+        ワーカーを `python -m design_diff.adapters.extraction._worker ...` で起動すると、
+        その起動自体がツール自身のパッケージ `design_diff` を先にimportしてしまう。
+        解析対象がたまたま同じ名前(`design_diff`)だと、Inspectorが対象ファイルを
+        importしようとした時に sys.modules に既に載っている『ツール自身の
+        design_diffパッケージ』(このリポジトリのsrc/)を再利用してしまい、
+        対象ワークツリーのクラスが一つも見つからない(例外なく0クラス)。
+
+        対策: ワーカーは `-m <dotted module>` ではなく、ファイルパスを直接指定して
+        起動する。これにより起動時に `design_diff` パッケージのimportが発生しない。
+        """
+        package = "design_diff"  # ツール自身と同じ名前をあえて使う
+        write_package(tmp_path, package, CAR_V1)
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package)
+
+        assert f"{package}.models.Car" in snapshot.classes
+        assert f"{package}.models.Engine" in snapshot.classes
+
 
 class TestPy2pumlExtractorSrcLayout:
     def test_extracts_classes_when_package_lives_under_src(self, tmp_path):

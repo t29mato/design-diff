@@ -2,7 +2,9 @@
 アダプタ注入だけの薄い殻。CLIと同じ方針。
 """
 
-from design_diff.action.main import main
+from pathlib import Path
+
+from design_diff.action.main import ActionConfig, main, parse_config
 from design_diff.application.use_cases.compute_design_diff import DesignDiffResult
 from design_diff.domain.diff import ClassDiff, RelationDiff, SnapshotDiff
 from design_diff.domain.model import ClassIR
@@ -71,8 +73,6 @@ class TestActionMain:
             use_case_factory=factory,
         )
 
-        from pathlib import Path
-
         assert received == [(Path("/some/repo"), "owner/repo")]
 
     def test_include_dunder_flag_is_passed_through(self):
@@ -105,3 +105,47 @@ class TestActionMain:
 
         captured = capsys.readouterr()
         assert captured.out.strip() == CANNED_RESULT_WITH_CHANGES.json_payload
+
+
+class TestParseConfig:
+    """argparse.NamespaceではなくActionConfig(型付きの値オブジェクト)を組み立てる。
+
+    生のNamespaceを引き回すと属性名の綴りミスが実行時までわからない。
+    値オブジェクトにすることで、呼び出し側(main())が扱うデータの形を
+    ドメイン層と同じように明示できる。
+    """
+
+    def test_builds_an_action_config_from_parsed_args(self):
+        config = parse_config(
+            ["main", "feature", "--package", "pkg", "--pr", "42", "--repo", "owner/repo"]
+        )
+
+        assert config == ActionConfig(
+            base_ref="main",
+            head_ref="feature",
+            package="pkg",
+            pr=42,
+            repo="owner/repo",
+            repo_path=None,
+            include_dunder=False,
+        )
+
+    def test_builds_an_action_config_with_optional_fields_set(self):
+        config = parse_config(
+            [
+                "main",
+                "feature",
+                "--package",
+                "pkg",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--repo-path",
+                "/some/repo",
+                "--include-dunder",
+            ]
+        )
+
+        assert config.repo_path == Path("/some/repo")
+        assert config.include_dunder is True

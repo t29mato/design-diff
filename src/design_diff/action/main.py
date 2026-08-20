@@ -108,12 +108,11 @@ def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _defa
         # 実行時コンテキスト依存のオブジェクトにアクセスしていると解析全体が失敗しうる。
         # Actionのログに生の巨大なトレースバックではなく分かりやすい説明を残す。
         print(
-            "対象コードの解析中にエラーが発生しました。design-diffは対象コードを"
-            "実際にimportして解析するため、(1) モジュールレベルで実行時コンテキスト"
-            "依存のオブジェクト(Flaskのcurrent_app等)にアクセスするコード、"
-            "(2) py2pumlが解決できない型注釈記法(typing.Type等)、"
-            "などが対象パッケージ内にあると、解析全体が失敗することがあります。"
-            "詳細:\n" + str(error),
+            "対象コードの解析中にエラーが発生しました。design-diffは対象コードを実際に"
+            "importし、py2pumlで型注釈を解析するため、対象パッケージの記法によっては"
+            "解析全体が失敗することがあります(既知の例: 実行時コンテキスト依存の"
+            "オブジェクトへのアクセス[Flaskのcurrent_app等]、typing.Type等の特殊な"
+            "型注釈、文字列リテラルの前方参照Optional[\"X\"]等)。詳細:\n" + str(error),
             file=sys.stderr,
         )
         return 1

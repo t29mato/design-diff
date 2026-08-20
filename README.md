@@ -223,6 +223,35 @@ MIT License。詳細は [LICENSE](./LICENSE) を参照。
 いずれも寛容(permissive)なライセンスで、MITとの互換性に問題はない。
 コピーレフト(GPL系)の依存は無い。
 
+### PyPI公開の準備(雛形のみ・未実行)
+
+`.github/workflows/publish.yml` に、タグ(`v*`)のpushをトリガーとするPyPI公開
+ワークフローの雛形を用意してある。**このワークフローはまだ一度も実行しておらず、
+実行するには以下の設定を人間(メンテナ)がGitHub/PyPI側で行う必要がある**:
+
+- [ ] **GitHubリポジトリ側**: Settings → Environments → New environment で
+  `release` という名前のEnvironmentを作成する
+- [ ] 作成した `release` Environmentに **Required reviewers** を設定し、
+  公開を承認できる人(メンテナ自身)を指定する。これにより、タグをpushしても
+  実際の公開ジョブはレビュワーの承認が下りるまで一時停止する
+- [ ] **PyPI側**: [pypi.org](https://pypi.org) にログインし、対象プロジェクト
+  (初回は「pending publisher」として事前登録可能)の Settings → Publishing で
+  Trusted Publisher を追加する。以下を指定する:
+  - Owner: `t29mato`
+  - Repository name: `design-diff`
+  - Workflow name: `publish.yml`
+  - Environment name: `release`
+- [ ] 上記が完了して初めて、タグをpushした際にPyPIへの公開が可能になる
+  (Environmentの承認が下りるまでは公開されない)
+
+Trusted Publisher(OIDC)方式を採用しており、長期のAPIトークンをリポジトリの
+シークレットとして保持しない設計にしている(短命のOIDCトークンをGitHub Actions
+が発行し、PyPI側が事前登録された発行元だけを信頼する)。
+
+**このワークフローを実行する(=実際にタグをpushして公開する)には、上記設定に
+加えて、その都度メンテナ本人の判断と承認が必要**。design-diffが自律的にタグを
+打ち直したりこのワークフローを実行したりすることはない。
+
 ## 開発
 
 設計ドキュメント: [docs/design/architecture.md](./docs/design/architecture.md)

@@ -1,0 +1,68 @@
+name: Publish to PyPI
+
+# 【重要】このワークフローは雛形として用意するのみで、実行はしない(2026-08-20時点)。
+# PyPI公開は人間の承認が必要な事項であり、design-diffが自律的に実行してはならない。
+#
+# 保護の仕組み:
+# - タグ(v*)のpushをトリガーにするが、実際に公開する`publish` jobは
+#   GitHub Environment `release` に紐付けてある。このEnvironmentに
+#   required reviewers を設定しておくと、GitHub側がjobの実行を一時停止し、
+#   指定したレビュワーの承認が下りるまでPyPIへのアクセス(OIDCトークンの発行)
+#   自体が行われない。タグをpushしただけでは公開されない。
+# - Trusted Publisher(OIDC)方式を採用し、長期のAPIトークンをリポジトリの
+#   シークレットとして保持しない(id-token: write権限でGitHub Actionsが
+#   短命のOIDCトークンを発行し、PyPI側が事前登録された発行元だけを信頼する)。
+#
+# 人間が行うべきセットアップ手順は README.md 「PyPI公開の準備」を参照。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Build distribution (sdist + wheel)
+        run: uv build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # ここが承認ゲート。GitHub側でこのEnvironment(名前は"release")に
+    # required reviewers を設定しておくこと(README参照)。設定されていないと
+    # このjobは承認無しに進んでしまうため、設定を忘れないこと。
+    environment:
+      name: release
+      url: https://pypi.org/project/design-diff/
+    permissions:
+      # Trusted Publisher(OIDC)方式に必要な権限。長期APIトークンは使わない。
+      id-token: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI (Trusted Publisher / OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # api-token等は指定しない。PyPI側で本リポジトリ・本ワークフロー・
+        # このEnvironmentをTrusted Publisherとして事前登録しておく必要がある
+        # (README「PyPI公開の準備」参照)。未登録の場合、この手順は失敗する。

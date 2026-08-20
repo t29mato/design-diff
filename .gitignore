@@ -10,3 +10,4 @@ coverage.xml
 .design-diff-worktrees/
 .claude/
 .DS_Store
+dist/

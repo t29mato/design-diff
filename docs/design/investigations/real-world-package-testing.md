@@ -18,9 +18,9 @@ design-diffを同じ venv にインストールした上で(`design-diff`はpy2p
 |---|---|---|---|---|
 | requests | v2.31.0 → v2.32.3 | ✅ 完走 | 1.12秒 | `HTTPAdapter.max_retries`属性が2行重複表示される**実バグを発見・修正**(型注釈のみの宣言と`__init__`代入の重複。後述) |
 | flask | 3.0.0 → 3.0.3 | ❌ 解析失敗(クリーンに失敗) | 1.37秒 | py2pumlが`werkzeug.local.LocalProxy`(Flaskの`current_app`等)の`repr()`評価時に`RuntimeError: Working outside of application context`で例外。**design-diff自体はクラッシュせず、分かりやすいエラーメッセージを出して終了**(後述の修正) |
-| click | 8.1.0 → 8.1.7 | ❌ 解析失敗(クリーンに失敗) | 0.79秒 | py2pumlが`typing.Type`という型注釈を解決できず`ValueError`。同じく分かりやすいエラーで終了 |
-| rich | v13.6.0 → v13.7.1 | ❌ 解析失敗(クリーンに失敗) | 1.28秒 | py2pumlが文字列リテラルの前方参照`Optional["Live"]`を解決できず`ValueError`。同じく分かりやすいエラーで終了 |
-| httpx | 0.26.0 → 0.27.0 | ❌ 解析失敗(クリーンに失敗) | 1.00秒 | py2pumlが`typing.Dict`という型注釈を解決できず`ValueError`(clickと同種) |
+| click | 8.1.0 → 8.1.7 | ❌ 解析失敗(クリーンに失敗) | 0.79秒 | `import typing as t`というエイリアス付きimportが原因でpy2pumlの名前解決が失敗(**当初「typing.Typeが解決できない」と報告したが不正確だった。真因は下記参照**) |
+| rich | v13.6.0 → v13.7.1 | ❌ 解析失敗(クリーンに失敗) | 1.28秒 | `Live`クラスが循環import回避のため`TYPE_CHECKING`限定でimportされており、`Optional["Live"]`という文字列前方参照を実行時に解決できない(真因は下記参照) |
+| httpx | 0.26.0 → 0.27.0 | ❌ 解析失敗(クリーンに失敗) | 1.00秒 | clickと同種の名前解決失敗(詳細未特定だがエイリアス/TYPE_CHECKING限定importのいずれかと推定) |
 | requests(旧) | v0.10.0 → v0.13.0(2012年頃、Python 2時代) | ❌ 解析失敗(クリーンに失敗) | 0.75秒 | Python 3では`cookielib`(Python 2専用モジュール)が無くimport自体が失敗。design-diffの対応範囲外(Python 3で実行できないコードは解析できない)だが、これもクラッシュではなく分かりやすいエラーで終了 |
 
 ## 総括
@@ -33,17 +33,22 @@ design-diffを同じ venv にインストールした上で(`design-diff`はpy2p
   「型注釈が豊富な現代的なパッケージ4/4が解析失敗」という結果。この点は
   README/CHANGELOGに正直に記載する必要がある(下記)
 - 失敗の根本原因はいずれも**py2puml本体**の型注釈解決ロジックの制約であり、
-  design-diff固有のバグではない。3つの異なるパターンを実際に発見した:
-  1. モジュールレベルで実行時コンテキスト依存のオブジェクト(Flaskの`current_app`等、
-     `werkzeug.local.LocalProxy`)にアクセスするコードがあると、`repr()`評価が
-     失敗して解析全体が落ちる
-  2. `typing.Type`/`typing.Dict`のように、`typing`モジュールを`import typing`で
-     読み込み`typing.X`の形で参照する型注釈を、py2pumlの名前解決ロジックが
-     解決できない(`from typing import X`の形なら問題ない可能性がある。未検証)
-  3. `Optional["ClassName"]`のような、文字列リテラルによる前方参照(循環import
-     回避のための一般的なイディオム)をpy2pumlが無効な型注釈と誤判定する
+  design-diff固有のバグではない。ただし**当初この場に書いていた「typing.X形式
+  が解決できない」という説明は不正確だった**(司令塔の反証により判明。
+  `import typing`をエイリアス無しで書けば`typing.Dict[...]`は正しく解決される
+  ことを確認済み)。最小再現コードまで絞り込んで検証し直した正確な真因は
+  [py2puml-resolution-failures-root-cause.md](./py2puml-resolution-failures-root-cause.md)
+  に記録した。要約すると、py2pumlは型注釈を`typing.get_type_hints()`のような
+  正式な解決手段ではなく「モジュールの実行時の名前空間から`getattr()`で引く」
+  方式で解決しており、(1)`import typing as t`のようなエイリアス付きimport、
+  (2)循環import回避のための`TYPE_CHECKING`限定import、のいずれかで注釈が
+  参照する名前が実行時に存在しない場合に解決が失敗する。Flaskのケースは
+  これらとは別の、モジュール内総当たり走査中の`str()`失敗によるクラッシュ
 - design-diffはpy2pumlをforkしない方針([docs/design/architecture.md](../architecture.md)
-  §7で既に決定済み)のため、これらの根本原因そのものを直接修正することはできない
+  §7で既に決定済み)のため、これらの根本原因そのものを直接修正することはできない。
+  文字列リテラル前方参照の引用符を剥がす部分的な回避策も試したが、実戦テストで
+  遭遇した実際のケース(TYPE_CHECKING限定import)には効かず、採用しなかった
+  (詳細は上記ドキュメント参照)
 
 ## 修正した問題
 

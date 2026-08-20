@@ -104,15 +104,18 @@ def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _defa
             include_dunder=config.include_dunder,
         )
     except Py2pumlExtractionError as error:
-        # cli/main.pyと同じ回帰対応(実戦テストで発見): PRのコードがモジュールレベルで
-        # 実行時コンテキスト依存のオブジェクトにアクセスしていると解析全体が失敗しうる。
-        # Actionのログに生の巨大なトレースバックではなく分かりやすい説明を残す。
+        # cli/main.pyと同じ回帰対応(実戦テストで発見)。真因は
+        # docs/design/investigations/py2puml-resolution-failures-root-cause.md
+        # に最小再現付きで記録済み(実行時コンテキスト依存オブジェクト、importの
+        # エイリアス、TYPE_CHECKING限定importの3パターン)。Actionのログに生の
+        # 巨大なトレースバックではなく分かりやすい説明を残す。
         print(
             "対象コードの解析中にエラーが発生しました。design-diffは対象コードを実際に"
             "importし、py2pumlで型注釈を解析するため、対象パッケージの記法によっては"
             "解析全体が失敗することがあります(既知の例: 実行時コンテキスト依存の"
-            "オブジェクトへのアクセス[Flaskのcurrent_app等]、typing.Type等の特殊な"
-            "型注釈、文字列リテラルの前方参照Optional[\"X\"]等)。詳細:\n" + str(error),
+            "オブジェクトへのアクセス[Flaskのcurrent_app等]、importのエイリアス"
+            "[import typing as t等]、循環import回避のためのTYPE_CHECKING限定import)。"
+            "詳細:\n" + str(error),
             file=sys.stderr,
         )
         return 1

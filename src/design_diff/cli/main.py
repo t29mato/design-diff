@@ -80,18 +80,22 @@ def main(
                 include_dunder=args.include_dunder,
             )
         except Py2pumlExtractionError as error:
-            # 実戦テスト(外部の実在パッケージ)で発見した回帰: design-diffは対象コードを
-            # 実際にimportして解析するため、モジュールレベルで実行時コンテキスト依存の
-            # オブジェクト(例: Flaskのcurrent_app/g/requestのようなwerkzeug.local.LocalProxy)
-            # にアクセスするコードがあると、解析全体が例外で落ちる。以前はpy2pumlの生の
-            # 巨大なトレースバックがそのままユーザーの端末に出ていた(クラッシュではなく
-            # 不親切な失敗)。説明を先頭に付けて非ゼロで終了する。
+            # 実戦テスト(外部の実在パッケージ)で発見した回帰。design-diffは対象コードを
+            # 実際にimportして解析するため、py2pumlの型解決ロジック(実行時のモジュール
+            # 名前空間からgetattr()で引く方式。typing.get_type_hints()のような正式な
+            # 解決手段ではない)が対応できないケースで解析全体が例外で落ちる。真因は
+            # docs/design/investigations/py2puml-resolution-failures-root-cause.md
+            # に最小再現付きで記録済み(実行時コンテキスト依存オブジェクト、importの
+            # エイリアス、TYPE_CHECKING限定importの3パターンを特定)。以前はpy2pumlの
+            # 生の巨大なトレースバックがそのままユーザーの端末に出ていた(クラッシュ
+            # ではなく不親切な失敗)。説明を先頭に付けて非ゼロで終了する。
             print(
                 "対象コードの解析中にエラーが発生しました。design-diffは対象コードを実際に"
                 "importし、py2pumlで型注釈を解析するため、対象パッケージの記法によっては"
                 "解析全体が失敗することがあります(既知の例: 実行時コンテキスト依存の"
-                "オブジェクトへのアクセス[Flaskのcurrent_app等]、typing.Type等の特殊な"
-                "型注釈、文字列リテラルの前方参照Optional[\"X\"]等)。詳細:\n" + str(error),
+                "オブジェクトへのアクセス[Flaskのcurrent_app等]、importのエイリアス"
+                "[import typing as t等]、循環import回避のためのTYPE_CHECKING限定import)。"
+                "詳細:\n" + str(error),
                 file=sys.stderr,
             )
             return 1

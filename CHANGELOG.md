@@ -15,14 +15,17 @@ v0.1.0タグ後、公開前に実施した実戦テスト(実在の外部Python�
   イディオム)属性が、py2pumlの挙動により2行重複して表示されるバグを修正
   (`requests.adapters.HTTPAdapter.max_retries`で実際に発生)
 - 対象コードの解析がpy2puml本体の制約で失敗する場合(実行時コンテキスト依存の
-  オブジェクトへのアクセス、`typing.Type`等の特殊な型注釈、文字列リテラルの
-  前方参照)に、生の巨大なトレースバックではなく分かりやすいエラーメッセージを
-  出して非ゼロ終了するようにした(CLI/GitHub Action共通)
+  オブジェクトへのアクセス、importのエイリアス、循環import回避のための
+  TYPE_CHECKING限定importのいずれか)に、生の巨大なトレースバックではなく
+  分かりやすいエラーメッセージを出して非ゼロ終了するようにした
+  (CLI/GitHub Action共通)
 
 ### Known Limitations(追加)
 
 - 型注釈が豊富な現代的なパッケージほど、py2puml本体の型注釈解決ロジックの
   制約に触れやすい(実戦テストでrequests以外の4/5パッケージが解析失敗)。
+  真因は最小再現コードまで絞り込んで検証済み(詳細は
+  [docs/design/investigations/py2puml-resolution-failures-root-cause.md](./docs/design/investigations/py2puml-resolution-failures-root-cause.md))。
   クラッシュ・無限ループ・異常な長時間実行にはならないことは確認済み
 
 ## [0.1.0] - 2026-08-20

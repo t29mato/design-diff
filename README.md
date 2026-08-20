@@ -183,18 +183,23 @@ Mermaidブロックも同梱されるため、JSON単体でも人間可読な図
 - **Limitations(実戦テストで判明)**: **型注釈が豊富な現代的なパッケージほど、
   py2puml本体の型注釈解決ロジックの制約に触れやすい**。実在のPythonパッケージ
   5つ(requests/flask/click/rich/httpx)で実際にテストしたところ、requests以外の
-  4つで解析が失敗した。既知のパターンは3つ:
-  (1) モジュールレベルで実行時コンテキスト依存のオブジェクト(Flaskの
-  `current_app`等、`werkzeug.local.LocalProxy`)にアクセスするコードがあると
-  解析全体が落ちる、
-  (2) `typing.Type`/`typing.Dict`のように`import typing`経由で`typing.X`と
-  参照する型注釈をpy2pumlが解決できない、
-  (3) `Optional["ClassName"]`のような文字列リテラルの前方参照を無効な型注釈と
-  誤判定する。
+  4つで解析が失敗した。真因を最小再現コードまで絞り込んで検証した結果、
+  py2pumlは型注釈を`typing.get_type_hints()`のような正式な解決手段ではなく
+  「モジュールの実行時の名前空間から`getattr()`で引く」方式で解決しており、
+  以下のいずれかに該当すると解決に失敗することが分かった:
+  (1) `import typing as t`のような**importのエイリアス**(注釈が参照する名前が
+  モジュールの実際の名前空間に存在しない。clickで確認)、
+  (2) 循環import回避のための**`TYPE_CHECKING`限定import**(`Optional["Live"]`
+  のような文字列前方参照で、実行時には存在しない名前を参照する。richで確認)。
+  Flaskのケースはこれらとは別の、型解決のためのモジュール内総当たり走査中に
+  無関係なオブジェクトの`str()`が失敗してクラッシュする、という別のバグ。
   いずれもpy2puml本体の制約であり(forkしない方針のため直接修正しない)、
   **クラッシュ・無限ループ・異常な長時間実行にはならず、分かりやすいエラー
   メッセージを出して1〜2秒程度でクリーンに失敗する**ことは確認済み。
-  詳細は [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
+  詳細(最小再現コード付き)は
+  [docs/design/investigations/py2puml-resolution-failures-root-cause.md](./docs/design/investigations/py2puml-resolution-failures-root-cause.md)、
+  実戦テスト全体の結果は
+  [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
 - **Security**: **対象コードを実際にimportして解析する**(ASTを静的に読むだけでは
   ない)。つまりモジュールレベルの文・デコレータ・メタクラスが実行される。
   信頼できる自分のリポジトリのコードに対してのみ実行すること。GitHub Actionは

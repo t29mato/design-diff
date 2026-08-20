@@ -4,7 +4,14 @@
 スクロールせずに「何が増え、何が消え、何が変わり、どの依存が生えたか」が
 一目で分かること。そのために:
 
-- 3状態(追加/削除/変更)をclassDefで色分け
+- 3状態(追加/削除/変更)を**ASCIIのステータスタグ**(`[+]`/`[-]`/`[~]`)でラベルに前置する。
+  Mermaidの`classDef`/`cssClass`によるclassDiagramのスタイリングは、
+  GitHub・mermaid.live双方の実機検証で全く反映されないことを確認した
+  (upstream Mermaidの既知の問題。https://github.com/mermaid-js/mermaid/issues/1649)。
+  絵文字は視覚的には代替になるが、フォント・環境依存(グローバルな利用を考えると
+  絵文字を持たない環境がある)や「装飾で誤魔化している」印象を避けるため採用しない。
+  JSON出力やnote内の差分表記(`+`/`-`/`~`)と同じ記法に統一し、色に頼らず
+  テキストだけで状態が伝わるようにする(色が付けば併用でボーナス程度の位置づけ)
 - 完全修飾名(fqn)をそのままラベルにしない。短い名前 + namespace記法でグループ化
   (fqnはノードIDとしてのみ使い、表示ラベルは短縮する)
 - 変更のないクラスは出さない(ノイズ削減)
@@ -33,13 +40,10 @@ def make_class(fqn, attributes=(), methods=(), is_abstract=False) -> ClassIR:
 
 
 class TestMermaidRendererStructure:
-    def test_starts_with_class_diagram_header_and_style_defs(self):
+    def test_starts_with_class_diagram_header(self):
         output = MermaidRenderer().render(EMPTY_DIFF)
 
         assert output.startswith("classDiagram")
-        assert "classDef added" in output
-        assert "classDef removed" in output
-        assert "classDef modified" in output
 
     def test_ignores_the_mermaid_kwarg(self):
         """MermaidRenderer自身はRendererPortのmermaid/meta引数を無視してよい(§2)。"""
@@ -59,7 +63,7 @@ class TestMermaidRendererLabelsAndNamespaces:
 
         output = MermaidRenderer().render(diff)
 
-        assert '["Product"]' in output
+        assert "Product" in output
         assert "shop.domain.models.Product" not in output  # fqnそのままはラベルに出さない
 
     def test_groups_classes_by_module_path_using_namespace_syntax(self):
@@ -93,30 +97,27 @@ class TestMermaidRendererLabelsAndNamespaces:
 
         output = MermaidRenderer().render(diff)
 
-        assert '["Engine"]' in output
-        assert ":::added" not in output.split('["Engine"]')[0].splitlines()[-1]
+        assert '["Engine"]' in output  # 文脈上の参照のみなのでステータスタグは付かない
 
 
 class TestMermaidRendererAddedRemoved:
-    def test_renders_added_class_with_added_style(self):
+    def test_renders_added_class_with_added_tag(self):
         added = make_class("pkg.models.Battery", attributes=(AttributeIR(name="capacity_kwh", type="float"),))
         diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
 
         output = MermaidRenderer().render(diff)
 
-        assert ':::added' in output
-        assert '["Battery"]' in output
+        assert '["[+] Battery"]' in output
         assert "capacity_kwh" in output
         assert "float" in output
 
-    def test_renders_removed_class_with_removed_style(self):
+    def test_renders_removed_class_with_removed_tag(self):
         removed = make_class("pkg.models.Wheel", attributes=(AttributeIR(name="diameter", type="float"),))
         diff = SnapshotDiff(classes=ClassDiff(removed=(removed,)), relations=RelationDiff())
 
         output = MermaidRenderer().render(diff)
 
-        assert ':::removed' in output
-        assert '["Wheel"]' in output
+        assert '["[-] Wheel"]' in output
 
     def test_renders_methods_with_parameters_and_return_type(self):
         added = make_class(
@@ -218,8 +219,7 @@ class TestMermaidRendererModified:
 
         output = MermaidRenderer().render(diff)
 
-        assert ':::modified' in output
-        assert '["Car"]' in output
+        assert '["[~] Car"]' in output
         assert "battery" in output  # head時点の属性を表示
         assert "note for pkg_models_Car" in output
         assert "+ battery" in output  # noteの中に差分サマリ
@@ -294,7 +294,7 @@ class TestMermaidRendererSizeCap:
         output = MermaidRenderer(max_classes=20).render(diff)
 
         for cls in added:
-            assert f'["{cls.name}"]' in output
+            assert f'["[+] {cls.name}"]' in output
 
     def test_caps_the_number_of_rendered_classes_when_over_the_limit(self):
         added = self._make_many_added_classes(25)
@@ -302,7 +302,7 @@ class TestMermaidRendererSizeCap:
 
         output = MermaidRenderer(max_classes=20).render(diff)
 
-        rendered_count = sum(1 for cls in added if f'["{cls.name}"]' in output)
+        rendered_count = sum(1 for cls in added if f'["[+] {cls.name}"]' in output)
         assert rendered_count == 20
 
     def test_adds_a_summary_note_when_capped(self):
@@ -326,8 +326,8 @@ class TestMermaidRendererSizeCap:
 
         output = MermaidRenderer(max_classes=1).render(diff)
 
-        assert '["Big"]' in output
-        assert '["Small"]' not in output
+        assert '["[+] Big"]' in output
+        assert '["[+] Small"]' not in output
 
     def test_output_remains_valid_standalone_mermaid_text_when_capped(self):
         """要約は`note "..."` というMermaid標準構文で表現し、Markdown表などは混ぜない

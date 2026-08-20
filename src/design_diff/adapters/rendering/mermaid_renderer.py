@@ -4,7 +4,16 @@
 スクロールせずに「何が増え、何が消え、何が変わり、どの依存が生えたか」が
 一目で分かること。そのための設計判断:
 
-- 3状態を classDef + cssClass で色分け: 追加=緑、削除=赤、変更=黄
+- **3状態はラベルのASCIIステータスタグ(`[+]`追加 / `[-]`削除 / `[~]`変更)で示す**。
+  当初は`classDef`+`cssClass`による色分けを検討したが、GitHub・mermaid.live双方の
+  実機検証で「classDiagramのcssClassスタイリングが全く反映されない」ことを確認した
+  (design-diff固有の不具合ではなく、upstream Mermaidの既知の問題。
+  https://github.com/mermaid-js/mermaid/issues/1649 )。
+  絵文字での代替も検討したが、環境によって絵文字グリフを持たない場合がある
+  (グローバルな利用を想定すると前提にできない)ため採用しない。
+  ASCII記号のステータスタグなら環境非依存で確実に描画され、JSON出力やnote内の
+  差分表記(`+`/`-`/`~`)とも記法が一貫する。色付けが将来Mermaid側で直っても、
+  このタグ表記自体は無意味にならない(そのときは色+タグの二重表示になるだけ)
 - **表示ラベルは短いクラス名にし、fqnはノードID(内部識別子)としてのみ使う**。
   fqnをそのままラベルにすると `design_diff.application.use_cases.compute_design_diff.
   ComputeDesignDiffUseCase` のような長大な文字列が並び、図として破綻する。
@@ -31,11 +40,11 @@ from __future__ import annotations
 from design_diff.domain.diff import AttributeDiff, ClassModification, MethodDiff, SnapshotDiff
 from design_diff.domain.model import AttributeIR, ClassIR, MethodIR, RelationIR, RelationType
 
-_CLASS_DEFS = (
-    "    classDef added fill:#e6ffed,stroke:#22863a,color:#22863a",
-    "    classDef removed fill:#ffeef0,stroke:#b31d28,color:#b31d28",
-    "    classDef modified fill:#fff8e6,stroke:#b08800,color:#7a5c00",
-)
+_STATUS_TAG = {
+    "added": "[+] ",
+    "removed": "[-] ",
+    "modified": "[~] ",
+}
 
 _RELATION_ARROW = {
     RelationType.COMPOSITION: "*--",
@@ -99,9 +108,8 @@ class _ClassDeclaration:
         self.body_lines = body_lines
 
     def render(self) -> list[str]:
-        header = f'    class {self.node_id}["{self.label}"]'
-        if self.style:
-            header += f":::{self.style}"
+        tag = _STATUS_TAG.get(self.style, "") if self.style else ""
+        header = f'    class {self.node_id}["{tag}{self.label}"]'
         if not self.body_lines:
             return [header]
         return [header + " {", *self.body_lines, "    }"]
@@ -181,7 +189,7 @@ class MermaidRenderer:
             for fqn in (relation.source_fqn, relation.target_fqn):
                 declarations.setdefault(fqn, _ClassDeclaration(fqn, style=None, body_lines=[]))
 
-        lines = ["classDiagram", *_CLASS_DEFS, ""]
+        lines = ["classDiagram"]
         lines.extend(self._render_namespaced_declarations(declarations))
 
         notes = self._collect_notes(selected)

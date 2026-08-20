@@ -4,35 +4,39 @@
 `design-diff diff main feature/discount-codes --package shop --format mermaid`
 の実際の出力(手を加えていない)。
 
-- `DiscountCode` クラスが追加された(緑)
-- `LegacyCouponBanner` クラスが削除された(赤)
-- `Cart` / `Product` が変更された(黄) — 何が増減したかは `note` に要約される
+- `DiscountCode` クラスが追加された(`[+]`)
+- `LegacyCouponBanner` クラスが削除された(`[-]`)
+- `Cart` / `Product` が変更された(`[~]`) — 何が増減したかは `note` に要約される
 - `Cart *-- DiscountCode` というコンポジション依存が新たに生えた
+
+状態はラベルのASCIIタグ(`[+]`/`[-]`/`[~]`)で示す。当初はMermaidの`classDef`/
+`cssClass`による色分けを検討したが、GitHub・mermaid.live双方の実機検証で
+classDiagramのスタイリングが全く反映されないことを確認した(design-diff固有では
+なくupstream Mermaidの既知の問題。[mermaid-js/mermaid#1649](https://github.com/mermaid-js/mermaid/issues/1649))。
+絵文字での代替も検討したが、環境によって絵文字グリフを持たない場合がありグローバルな
+利用を想定すると前提にできないため、環境非依存で確実に描画されるASCII記号を採用した
+(JSON出力やnote内の差分表記と同じ`+`/`-`/`~`に統一)。
 
 このMermaidブロックはGitHubのコメント/README上でそのままプレビューされる。
 
 ```mermaid
 classDiagram
-    classDef added fill:#e6ffed,stroke:#22863a,color:#22863a
-    classDef removed fill:#ffeef0,stroke:#b31d28,color:#b31d28
-    classDef modified fill:#fff8e6,stroke:#b08800,color:#7a5c00
-
     namespace shop.models {
-        class shop_models_Cart["Cart"]:::modified {
+        class shop_models_Cart["[~] Cart"] {
             +items: List[Product]
             +discount_code: Optional[DiscountCode]
             +add(product: Product): None
             +apply_code(code: DiscountCode): None
             +total(): float
         }
-        class shop_models_DiscountCode["DiscountCode"]:::added {
+        class shop_models_DiscountCode["[+] DiscountCode"] {
             +code: str
             +percent_off: float
         }
-        class shop_models_LegacyCouponBanner["LegacyCouponBanner"]:::removed {
+        class shop_models_LegacyCouponBanner["[-] LegacyCouponBanner"] {
             +text: str
         }
-        class shop_models_Product["Product"]:::modified {
+        class shop_models_Product["[~] Product"] {
             +name: str
             +price: float
             +category: Category

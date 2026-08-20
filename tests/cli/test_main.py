@@ -212,5 +212,5 @@ class TestCliEndToEnd:
 
         captured = capsys.readouterr()
         # fqnそのものではなく短いラベル + namespace記法で出力される(HQフィードバック)
-        assert 'class cli_e2e_pkg_models_Car["Car"]:::added' in captured.out
+        assert 'class cli_e2e_pkg_models_Car["[+] Car"]' in captured.out
         assert "namespace cli_e2e_pkg.models {" in captured.out

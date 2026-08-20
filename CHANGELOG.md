@@ -3,11 +3,25 @@
 このプロジェクトは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) と
 [Semantic Versioning](https://semver.org/lang/ja/) に準拠する。
 
-## [Unreleased]
+## [0.2.0] - 2026-08-21
+
+**目玉**: 属性の型解決を、py2puml本体のgetattr方式から標準ライブラリの
+`typing.get_type_hints()`ベースの自前実装に変更した。これにより、importの
+エイリアス(`import typing as t`)や循環import回避のための`TYPE_CHECKING`
+限定importを含む実世界のPythonパッケージ(flask/click/rich/httpx)で、
+以前は解析全体が失敗していたのが、正しく解析が完走するようになった。
 
 v0.1.0タグ後、公開前に実施した実戦テスト(実在の外部Pythonパッケージ5つ+
 古い未注釈コードベース1つ)で見つかった問題への対応。詳細は
 [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)。
+
+### Added
+
+- PyPI公開ワークフローの雛形(`.github/workflows/publish.yml`)。タグ(`v*`)の
+  pushをトリガーにするが、実際に公開するjobはGitHub Environment `release`の
+  required reviewersによる人間承認が下りるまで実行されない(Trusted Publisher/
+  OIDC方式。長期APIトークンは使わない)。**このワークフローはまだ実行していない**
+- Show HN下書き(`docs/marketing/show-hn-draft.md`)。**投稿はまだしていない**
 
 ### Changed
 
@@ -56,6 +70,12 @@ v0.1.0タグ後、公開前に実施した実戦テスト(実在の外部Python�
 初回リリース。base/head 2つのgit refから、指定したPythonパッケージのクラス構造
 (クラス・継承・コンポジション依存)を抽出し、差分をMermaid classDiagramと
 機械可読JSONで出力するMVP。
+
+> **注記**: このバージョンのタグ(`v0.1.0`)は作成したが、PyPI公開・GitHub
+> Release発行はいずれも行っていない。タグ作成後に実施した実戦テストで
+> flask/click/rich/httpxの解析が失敗する問題が見つかり、上記の`[0.2.0]`で
+> 修正した。`v0.1.0`のタグ自体は履歴として残すが、実質的にこのバージョンで
+> 公開したことは無い。
 
 ### Added
 

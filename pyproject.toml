@@ -1,6 +1,6 @@
 [project]
 name = "design-diff"
-version = "0.1.0"
+version = "0.2.0"
 description = "Class-level structure diff for Python PRs: Mermaid classDiagram + JSON, for humans and AI reviewers."
 readme = "README.md"
 license = "MIT"

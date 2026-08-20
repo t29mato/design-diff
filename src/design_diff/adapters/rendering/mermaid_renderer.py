@@ -60,13 +60,26 @@ def _namespace(fqn: str) -> str | None:
     return fqn.rsplit(".", 1)[0]
 
 
+def _visibility(name: str) -> str:
+    """Mermaidの可視性マーカー。命名規約に従い、アンダースコア始まりは`-`(private)。
+
+    HQフィードバック: 全メンバーが`+`(public)一色だと、図から公開APIが読み取れない。
+    """
+    return "-" if name.startswith("_") else "+"
+
+
 def _render_attribute_line(attribute: AttributeIR) -> str:
-    return f"        +{attribute.name}: {attribute.type}"
+    marker = _visibility(attribute.name)
+    if attribute.type is None:
+        # HQフィードバック: 型注釈が無いだけなのに`None`という偽の型名が出るのを防ぐ。
+        # 型が取れない場合は型部分自体を省略する。
+        return f"        {marker}{attribute.name}"
+    return f"        {marker}{attribute.name}: {attribute.type}"
 
 
 def _render_method_line(method: MethodIR) -> str:
     params = ", ".join(f"{p.name}: {p.type}" if p.type else p.name for p in method.parameters)
-    signature = f"        +{method.name}({params})"
+    signature = f"        {_visibility(method.name)}{method.name}({params})"
     if method.return_type:
         signature += f": {method.return_type}"
     return signature

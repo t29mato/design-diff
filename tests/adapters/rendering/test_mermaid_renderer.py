@@ -131,6 +131,74 @@ class TestMermaidRendererAddedRemoved:
         assert "None" in output
 
 
+class TestMermaidRendererVisibility:
+    """HQフィードバック(残っている傷1): アンダースコア始まりのメンバーはMermaidの
+    可視性マーカー `-`(private)で描く。既定の`+`(public)一色だと、図から
+    公開APIが読み取れない。
+    """
+
+    def test_public_attribute_uses_plus_marker(self):
+        added = make_class("pkg.models.Car", attributes=(AttributeIR(name="engine", type="Engine"),))
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+engine: Engine" in output
+
+    def test_private_attribute_uses_minus_marker(self):
+        added = make_class("pkg.models.Car", attributes=(AttributeIR(name="_engine", type="Engine"),))
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "-_engine: Engine" in output
+        assert "+_engine: Engine" not in output
+
+    def test_public_method_uses_plus_marker(self):
+        added = make_class(
+            "pkg.models.Car", methods=(MethodIR(name="honk", parameters=(), return_type="None"),)
+        )
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+honk()" in output
+
+    def test_private_method_uses_minus_marker(self):
+        added = make_class(
+            "pkg.models.Car", methods=(MethodIR(name="_helper", parameters=(), return_type="None"),)
+        )
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "-_helper()" in output
+        assert "+_helper()" not in output
+
+
+class TestMermaidRendererUntypedMembers:
+    """HQフィードバック(残っている傷2): 型注釈が無い属性が偽の型名`None`として
+    表示される問題。型が取れない場合は型部分自体を省略する。
+    """
+
+    def test_omits_type_annotation_when_attribute_type_is_none(self):
+        added = make_class("pkg.models.Foo", attributes=(AttributeIR(name="payload", type=None),))
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+payload" in output
+        assert "+payload: None" not in output
+
+    def test_keeps_type_annotation_when_attribute_has_a_real_type(self):
+        added = make_class("pkg.models.Foo", attributes=(AttributeIR(name="price", type="float"),))
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+price: float" in output
+
+
 class TestMermaidRendererModified:
     def test_renders_modified_class_with_modified_style_and_note(self):
         base_car = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="List[Wheel]"),))

@@ -35,6 +35,37 @@ _WORKER_SCRIPT = Path(__file__).parent / "_worker.py"
 class Py2pumlExtractionError(RuntimeError):
     """ワーカーサブプロセスの実行に失敗した場合。"""
 
+    def friendly_message(self) -> str:
+        """CLI/Actionでそのままユーザーに見せる、分かりやすいメッセージを組み立てる。
+
+        design-diffは対象コードを実際にimportして解析するため、Python 3で実行
+        できないコードや、対象コード側の予期しない例外で解析が失敗することがある
+        (実戦テストで実際に確認。docs/design/investigations/
+        real-world-package-testing.md)。ModuleNotFoundError/ImportErrorが含まれる
+        場合は、design-diff自身の依存ではなく**解析対象パッケージ自身の実行時
+        依存関係**が実行環境に入っていないだけの典型的なケース(実戦テストの
+        再検証で実際に踏んだ)なので、その案内も添える。
+        """
+        text = str(self)
+        message = (
+            "対象コードの解析中にエラーが発生しました。design-diffは対象コードを実際に"
+            "importして解析するため、対象コードがPython 3で実行できない場合(構文エラー・"
+            "Python 2専用モジュールの参照等)や、対象コード側の予期しない例外により"
+            "解析全体が失敗することがあります。"
+        )
+        if "ModuleNotFoundError" in text or "ImportError" in text:
+            message += (
+                "\n\nModuleNotFoundError/ImportErrorが含まれています。design-diffは"
+                "解析対象パッケージを実際にimportするため、**対象パッケージ自身の"
+                "実行時依存関係も、design-diffを実行している環境にインストールされて"
+                "いる必要があります**(design-diff自身の依存の問題ではありません)。"
+                "対象リポジトリのrequirements.txt/pyproject.toml等に従って依存を"
+                "インストールしてから再実行してください。GitHub Actionでは通常、"
+                "対象リポジトリ自身のCIで既に依存がインストールされた環境で実行する"
+                "ため、この問題は起きにくいはずです。"
+            )
+        return f"{message}\n詳細:\n{text}"
+
 
 class Py2pumlExtractor:
     def extract(self, path: Path, package: str, *, include_dunder: bool = False) -> SnapshotIR:

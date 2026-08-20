@@ -178,14 +178,25 @@ Mermaidブロックも同梱されるため、JSON単体でも人間可読な図
 ## 制約・セキュリティ(Limitations & Security)
 
 - **Limitations**: **型アノテーションが無いコードでは依存が出ない**。design-diffは
-  py2pumlを使って型アノテーションから継承・コンポジション依存を抽出する。
-  型アノテーション文化を促進するツールでもある、と割り切っている
+  型アノテーションから継承・コンポジション依存を抽出する。型アノテーション文化を
+  促進するツールでもある、と割り切っている
+- **Limitations**: **解析対象パッケージ自身の実行時依存関係が必要**。design-diffは
+  対象コードを実際にimportして解析するため(下記Security参照)、対象パッケージが
+  依存するライブラリ(例: httpxなら`httpcore`/`certifi`等)も、design-diffを実行
+  している環境にインストールされている必要がある(design-diff自身の依存の問題では
+  ない)。無い場合は`ModuleNotFoundError`になるが、これはimportベースで解析する
+  以上避けられない性質で、design-diffのバグではない。CLI/GitHub Actionのエラー
+  メッセージにも「対象パッケージ自身の依存をインストールしてください」という
+  案内が出る。GitHub ActionでPRに対して実行する通常の文脈では、対象リポジトリ
+  自身のCIで依存が既にインストールされた環境で動かすため、実用上問題になることは
+  少ない
 - **実戦テスト済み**: 実在のPythonパッケージ5つ(requests/flask/click/rich/httpx)
-  に対して実際にdesign-diffを実行し、クラッシュ・無限ループ・異常な長時間実行が
-  無いことを確認済み。当初はflask/click/rich/httpxの4つで解析が失敗していたが、
-  真因(importのエイリアス・循環import回避のためのTYPE_CHECKING限定import・
-  実行時コンテキスト依存オブジェクトへのアクセス)を特定し、属性の型解決を
-  `typing.get_type_hints()`ベースの自前実装に置き換えることで解決した。
+  に対して、各パッケージ自身の依存を正しくインストールした上で実際にdesign-diffを
+  実行し、**全て解析が完走する**ことを確認済み(クラッシュ・無限ループ・異常な
+  長時間実行も無い)。開発途中でflask/click/rich/httpxの4つが解析失敗する問題が
+  見つかったが、真因(importのエイリアス・循環import回避のためのTYPE_CHECKING
+  限定import・実行時コンテキスト依存オブジェクトへのアクセス)を特定し、属性の
+  型解決を`typing.get_type_hints()`ベースの自前実装に置き換えることで解決した。
   詳細な経緯・最小再現コードは
   [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)、
   [docs/design/investigations/py2puml-resolution-failures-root-cause.md](./docs/design/investigations/py2puml-resolution-failures-root-cause.md)

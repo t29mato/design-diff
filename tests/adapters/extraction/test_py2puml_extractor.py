@@ -311,3 +311,44 @@ class TestPy2pumlExtractorRealWorldRegressions:
 
         console = snapshot.classes[f"{package}.models.Console"]
         assert {a.name for a in console.attributes} == {"live"}
+
+
+class TestPy2pumlExtractionErrorFriendlyMessage:
+    """実戦テストの再検証(HQ指摘)で発見した回帰: 解析対象パッケージ自身の実行時
+    依存関係(idna/werkzeug等)がインストールされていない環境でdesign-diffを
+    実行するとModuleNotFoundErrorになる。design-diff自身の不具合ではなく、対象
+    パッケージ側の依存が足りないだけだと分かるよう、その場合は専用の案内を出す。
+    """
+
+    def test_generic_message_for_non_import_errors(self):
+        from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError
+
+        error = Py2pumlExtractionError("py2puml worker failed for path=... : SyntaxError: invalid syntax")
+
+        message = error.friendly_message()
+
+        assert "対象コードの解析中にエラーが発生しました" in message
+        assert "ModuleNotFoundError" not in message.split("詳細:")[0]
+
+    def test_adds_dependency_install_hint_for_module_not_found_error(self):
+        from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError
+
+        error = Py2pumlExtractionError(
+            "py2puml worker failed for path=... : ModuleNotFoundError: No module named 'idna'"
+        )
+
+        message = error.friendly_message()
+
+        assert "対象パッケージ自身の" in message
+        assert "インストール" in message
+
+    def test_adds_dependency_install_hint_for_import_error(self):
+        from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError
+
+        error = Py2pumlExtractionError(
+            "py2puml worker failed for path=... : ImportError: cannot import name 'X'"
+        )
+
+        message = error.friendly_message()
+
+        assert "対象パッケージ自身の" in message

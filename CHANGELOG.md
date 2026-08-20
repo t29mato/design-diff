@@ -33,14 +33,23 @@ v0.1.0タグ後、公開前に実施した実戦テスト(実在の外部Python�
 - パッケージ内の全モジュールを解析する際に`<pkg>.__main__`をimportすると、
   ガードの無い`__main__.py`(例: `flask/__main__.py`)が実際に実行されてしまう
   バグを修正(`__main__`モジュールを解析対象から除外)
+- `ModuleNotFoundError`/`ImportError`で解析が失敗した場合、design-diff自身の
+  依存の問題ではなく解析対象パッケージ自身の実行時依存関係が不足している
+  典型的なケースであることを案内するメッセージを追加
+  (`Py2pumlExtractionError.friendly_message()`)
 
 ### Known Limitations(追加)
 
+- **解析対象パッケージ自身の実行時依存関係が、design-diffの実行環境に
+  インストールされている必要がある**(design-diff自身の依存の問題ではない。
+  importベースで解析する以上避けられない性質)
 - Python 3で実行できないコード(Python 2専用構文・モジュール)は解析できない
   (design-diff自体がPython 3.12+のみ対応のため)
-- 型注釈が豊富な現代的なパッケージに対する実戦テスト(requests/flask/click/
-  rich/httpx)を実施し、全て解析が完走することを確認済み。経緯は
-  [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
+
+実在のPythonパッケージ5つ(requests/flask/click/rich/httpx)に対する実戦
+テストを実施し、各パッケージ自身の依存を正しくインストールした環境で
+**全て解析が完走する**ことを確認済み。経緯は
+[docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
 
 ## [0.1.0] - 2026-08-20
 

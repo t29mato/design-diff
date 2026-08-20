@@ -104,19 +104,10 @@ def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _defa
             include_dunder=config.include_dunder,
         )
     except Py2pumlExtractionError as error:
-        # cli/main.pyと同じ回帰対応(実戦テストで発見)。属性の型解決は
-        # typing.get_type_hints()ベースの自前実装に置き換え済みで、以前発生していた
-        # 主要な失敗パターン(importのエイリアス・TYPE_CHECKING限定import等)は解消した
-        # (詳細: docs/design/investigations/real-world-package-testing.md)。それでも
-        # 対象コードがPython 3で実行できない場合等は失敗しうる。Actionのログに生の
-        # 巨大なトレースバックではなく分かりやすい説明を残す。
-        print(
-            "対象コードの解析中にエラーが発生しました。design-diffは対象コードを実際に"
-            "importして解析するため、対象コードがPython 3で実行できない場合(構文エラー・"
-            "Python 2専用モジュールの参照等)や、対象コード側の予期しない例外により"
-            "解析全体が失敗することがあります。詳細:\n" + str(error),
-            file=sys.stderr,
-        )
+        # cli/main.pyと同じ回帰対応(実戦テストで発見)。以前はActionのログに生の
+        # 巨大なトレースバックがそのまま出ていた。friendly_message()が分かりやすい
+        # 説明を組み立てる(詳細: docs/design/investigations/real-world-package-testing.md)。
+        print(error.friendly_message(), file=sys.stderr)
         return 1
     print(result.json_payload)  # ワークフローのログに残す(コメント投稿の有無に関わらず)
     return 0

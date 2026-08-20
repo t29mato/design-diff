@@ -80,22 +80,13 @@ def main(
                 include_dunder=args.include_dunder,
             )
         except Py2pumlExtractionError as error:
-            # 実戦テスト(外部の実在パッケージ)で発見した回帰。design-diffは対象コードを
-            # 実際にimportして解析するため、Python 3で実行できないコード(構文エラー・
-            # Python 2専用モジュールの参照等)や、対象コード側の予期しない例外により
-            # 解析全体が失敗することがある。属性の型解決自体はtyping.get_type_hints()
-            # ベースの自前実装(importのエイリアス・TYPE_CHECKING限定importにも対応)に
-            # 置き換え済みで、以前発生していた主要な失敗パターンは解消した(詳細は
-            # docs/design/investigations/real-world-package-testing.md)。以前はこの
-            # 種のエラーで生の巨大なトレースバックがそのままユーザーの端末に出ていた
-            # (クラッシュではなく不親切な失敗)。説明を先頭に付けて非ゼロで終了する。
-            print(
-                "対象コードの解析中にエラーが発生しました。design-diffは対象コードを実際に"
-                "importして解析するため、対象コードがPython 3で実行できない場合(構文エラー・"
-                "Python 2専用モジュールの参照等)や、対象コード側の予期しない例外により"
-                "解析全体が失敗することがあります。詳細:\n" + str(error),
-                file=sys.stderr,
-            )
+            # 実戦テスト(外部の実在パッケージ)で発見した回帰。以前はこの種のエラーで
+            # 生の巨大なトレースバックがそのままユーザーの端末に出ていた(クラッシュ
+            # ではなく不親切な失敗)。friendly_message()が分かりやすい説明を組み立てる
+            # (ModuleNotFoundError/ImportErrorの場合は「対象パッケージ自身の依存を
+            # インストールしてください」という案内も付く。詳細は
+            # docs/design/investigations/real-world-package-testing.md)。
+            print(error.friendly_message(), file=sys.stderr)
             return 1
 
         if args.format == "json":

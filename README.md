@@ -56,6 +56,10 @@ design-diffが勝手にNode.jsパッケージを自動ダウンロードする�
 npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
 ```
 
+> **調査メモ**: Node.js/Puppeteer(Chromium)を要求しないSVG化経路(`mermaidx`という
+> Python製パッケージ)の存在を実機検証済み。乗り換えの投資判断はまだしていない。
+> 詳細は [docs/design/investigations/mermaid-svg-without-chromium.md](./docs/design/investigations/mermaid-svg-without-chromium.md)。
+
 ## 出力の読み方
 
 - `[+]` = 追加されたクラス、`[-]` = 削除されたクラス、`[~]` = 変更されたクラス。

@@ -1,0 +1,25 @@
+# design-diff
+
+> design-diff compares two Python code snapshots (base_ref, head_ref) and outputs
+> a class-level structure diff — added/removed/modified classes, inheritance,
+> composition dependencies — as a Mermaid classDiagram and machine-readable JSON.
+> Install: `uv add design-diff` (or `pip install design-diff`). Run:
+> `design-diff diff <base_ref> <head_ref> --package <pkg> --format mermaid|json|svg`.
+> Requires type annotations to detect dependencies. Executes the analyzed code
+> via import — only run against trusted (same-repo) code.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/t29mato/design-diff/main/README.md): usage, output format, GitHub Action, licensing, limitations & security
+- [AGENTS.md](https://raw.githubusercontent.com/t29mato/design-diff/main/AGENTS.md): setup/build/test/lint commands and conventions for coding agents contributing to this repo
+- [CHANGELOG.md](https://raw.githubusercontent.com/t29mato/design-diff/main/CHANGELOG.md): version history
+- [docs/design/architecture.md](https://raw.githubusercontent.com/t29mato/design-diff/main/docs/design/architecture.md): clean-architecture layering, domain model, diff algorithm, rendering policy, CI/security decisions and their rationale
+- [docs/examples/](https://github.com/t29mato/design-diff/tree/main/docs/examples): real CLI output examples (unedited), including the JSON schema in practice
+
+## Notes for AI reviewers
+
+- `--format json` produces a self-contained JSON payload with a `mermaid` field
+  containing the already-rendered diagram, so a reviewer can reproduce a
+  human-readable diagram from the JSON alone.
+- `has_changes: false` means no class-level structural change was detected;
+  the tool stays silent in that case (no PR comment is posted).

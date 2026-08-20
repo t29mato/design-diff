@@ -800,19 +800,22 @@ MVP実装フェーズで以下をリポジトリ直下に作成する(CLAUDE.md�
 
 ---
 
-## 13. CI基盤の方針(ローカルCI優先・self-hosted runner不採用)
+## 13. CI基盤の方針(ローカルCI + GitHub Actions併用・self-hosted runner不採用)
 
-実装フェーズで出た方針決定。GitHub Actionsのワークフロー自体
-(`.github/workflows/ci.yml`, `design-diff-comment.yml`)は完成させたが、
-**design-diffが現在privateリポジトリであるため、GitHub Actionsは実行しない**
-運用にした。
+実装フェーズで出た方針決定。当初はdesign-diffがprivateリポジトリで、GitHub
+Actionsが課金対象になることを避けるため「ワークフローは資産として置いておくが
+動かさない」運用にしていた。**2026-08-20、design-diffをpublicリポジトリ化した
+ことで、この制約は解消された**。publicリポジトリはGitHub Actionsの無料枠が
+無制限のため、`.github/workflows/ci.yml`・`design-diff-comment.yml`とも
+追加設定なしに自動実行されるようになり、実際にPRを作成してGitHub Actions経由の
+実行(コメント投稿・upsert・沈黙原則)を実機確認済み(Issue #2参照)。
 
-### 13.1 背景
+### 13.1 背景(private期間中の判断。現在は解消済みだが記録として残す)
 
 GitHub Actionsはpublicリポジトリでは無料枠が無制限だが、privateリポジトリでは
-課金対象になる。メンテナは課金を避けたいため、private期間中はワークフローを
+課金対象になる。private期間中はメンテナが課金を避けるため、ワークフローを
 「資産として置いておくが動かさない」状態にし、代わりにローカルCIで同水準の
-品質ゲートを担保する。
+品質ゲートを担保していた。
 
 ### 13.2 採用: ローカルCI(`scripts/ci.sh` + pre-pushフック)
 
@@ -823,8 +826,10 @@ GitHub Actionsはpublicリポジトリでは無料枠が無制限だが、privat
 - pre-pushフックは `.githooks/pre-push` に置き、`core.hooksPath` で有効化する
   (`.git/hooks` はリポジトリに含まれずクローンした人に共有されないため)。
   有効化手順は `scripts/install-hooks.sh` にまとめ、READMEに手順を明記した
-- `.github/workflows/ci.yml` は**削除しない**。public化した瞬間、追加設定なしに
-  無料で自動的に動き出す資産として維持する
+- `.github/workflows/ci.yml` は**削除しない**。public化により、追加設定なしに
+  無料で自動的に動き出す資産として維持する(実際に動き出したことを確認済み)。
+  ローカルCIはpublic化後も「pushする前に手元で素早くgreenを確認できる」利点が
+  あるため、GitHub Actionsと並行して維持する
 
 ### 13.3 不採用: self-hosted runner(理由を記録)
 
@@ -842,6 +847,6 @@ self-hosted runnerを使えばGitHub Actionsの課金を避けつつワークフ
    組み合わせになる。design-diff自身がpy2puml経由でコードをimportして実行する
    ツールであることも踏まえると(§5.5)、実行環境の分離は特に軽視できない
 
-この判断により、CI実行環境は「GitHub提供のホステッドrunner(public化後は無料)」
-と「ローカルCI(private期間中)」の2択に絞り、self-hosted runnerという第三の
-選択肢は意図的に排除した。
+この判断により、CI実行環境は「GitHub提供のホステッドrunner(public化済みで無料)」
+と「ローカルCI(手元での事前確認用)」の組み合わせに絞り、self-hosted runnerと
+いう第三の選択肢は意図的に排除した。

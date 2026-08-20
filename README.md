@@ -16,6 +16,41 @@ AIがコードを書く時代、人間のレビューは行diffから設計diff�
 
 出力例(実際にCLIを実行した結果、手を加えていない): [docs/examples/](./docs/examples/)
 
+### 出力例(抜粋)
+
+`design-diff diff main feature/discount-codes --package shop --format mermaid` の
+実際の出力(手を加えていない。完全版は
+[docs/examples/shop-discount-codes.md](./docs/examples/shop-discount-codes.md)):
+
+```mermaid
+classDiagram
+    namespace shop.models {
+        class shop_models_Cart["[~] Cart"] {
+            +items: List[Product]
+            +discount_code: Optional[DiscountCode]  [+]
+            +add(product: Product): None
+            +apply_code(code: DiscountCode): None  [+]
+            +total(): float
+        }
+        class shop_models_DiscountCode["[+] DiscountCode"] {
+            +code: str
+            +percent_off: float
+        }
+        class shop_models_LegacyCouponBanner["[-] LegacyCouponBanner"] {
+            +text: str
+        }
+    }
+    style shop_models_Cart fill:#fff8e6,stroke:#b08800,stroke-width:2px,color:#b08800
+    style shop_models_DiscountCode fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style shop_models_LegacyCouponBanner fill:#ffeef0,stroke:#b31d28,stroke-width:2px,color:#b31d28
+    shop_models_Cart *-- shop_models_DiscountCode
+```
+
+`DiscountCode`クラスの追加(緑)、`LegacyCouponBanner`クラスの削除(赤)、`Cart`の
+変更(黄。`discount_code`/`apply_code()`が新しく増えたメンバーだと行末の`[+]`で
+分かる)、`Cart *-- DiscountCode`という新しいコンポジション依存が、1枚の図に
+収まっている。
+
 ## 使い方
 
 ```bash
@@ -127,13 +162,12 @@ GitHub上で生の`<svg>`タグと`<img src="data:...">`の両方が実機検証
   実行することも、シークレットを渡すこともない。使うのは自動発行される
   `GITHUB_TOKEN` のみ(`permissions: pull-requests: write` で最小権限に絞る)
 
-**現状(private repoの間)**: GitHub Actionsはprivateリポジトリでは課金対象になる
-(publicリポジトリは無料枠が無制限)。design-diffは現在privateのため、
-このワークフローは意図的に「資産としてリポジトリに残してあるが、実行はしない」
-状態にしている。動作自体は自分のgh認証で `python -m design_diff.action.main` を
-手動実行して検証済み(実際にPRにコメントが投稿され、Mermaid図として描画される
-ところまで確認した)。public化した瞬間、このワークフローは追加設定なしに
-無料で自動的に動き出す。
+**動作確認済み**: design-diffはpublicリポジトリなのでGitHub Actionsは無料枠が
+無制限。実際にPRを作成し、`gh`での手動実行ではなく本物のpull_requestイベント
+経由で本ワークフローが自動実行され、コメントが投稿されてMermaid図として描画
+されること、2回目以降のpushで同一コメントがupsertされること(新規コメントが
+積み上がらない)、構造変化の無いPRではコメント自体が投稿されないこと(沈黙
+原則)を確認済み。
 
 ## JSON出力(LLMO / AIレビュアー向け)
 
@@ -182,12 +216,12 @@ uv run ruff check .
 uv run lint-imports
 ```
 
-### CIはローカルで回す(private repoの間)
+### CI
 
-**このプロジェクトのCIは現在ローカルで回している。GitHub Actionsのワークフロー
-(`.github/workflows/ci.yml`)は削除せず資産として残してあり、リポジトリを
-public化した瞬間に追加設定なしで無料で自動的に有効になる**設計にしている
-(privateリポジトリではGitHub Actionsが課金対象になるため、当面はそれを避ける)。
+publicリポジトリなので `.github/workflows/ci.yml` がpush/PRのたびに無料で
+自動実行される(GitHub Actions無料枠は無制限)。これに加えて、pushする前に
+同じ判定基準をローカルでも回せるようにしてある(手元でgreenを確認してから
+pushしたい場合や、Actionsの結果を待たずに素早くフィードバックを得たい場合用)。
 
 ローカルCIは `.github/workflows/ci.yml` と全く同じ順序・同じ判定基準
 (ruff → import-linter → pytest+カバレッジ → ドメイン層カバレッジ90%ゲート)を

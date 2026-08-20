@@ -13,8 +13,20 @@
 """
 
 import typing
+from dataclasses import dataclass
 
-from design_diff.adapters.extraction._worker import format_type, own_methods
+from design_diff.adapters.extraction._worker import _dedupe_attributes, format_type, own_methods
+
+
+@dataclass
+class _RawAttribute:
+    """py2pumlのUmlAttribute(name/type/static属性を持つ)の代役。実際のInspectorを
+    経由せずに `_dedupe_attributes` を単体テストするために使う。
+    """
+
+    name: str
+    type: str | None
+    static: bool
 
 
 class Vehicle:
@@ -175,3 +187,55 @@ class TestOwnMethodsTypeFormatting:
         methods = own_methods(ProductLister)
         find = next(m for m in methods if m["name"] == "find")
         assert find["return_type"] == "Optional[Product]"
+
+
+class TestDedupeAttributes:
+    """実運用パッケージ(requests.adapters.HTTPAdapter)を実際に解析して発見した回帰。
+
+    クラス本体で型だけ宣言し(`max_retries: Retry`。値の代入は無い)、`__init__`内で
+    `self.max_retries = ...` と代入する、よくあるPythonのイディオムに対し、py2pumlは
+    同名の属性を「static=True(クラス本体の注釈)」と「static=False(インスタンス
+    属性)」の2つの別属性として重複して返す。値の無いアノテーションは実体のある
+    クラス属性を作らないため、design-diffの出力では1つにまとめるべき。
+    """
+
+    def test_merges_duplicate_names_preferring_the_instance_attribute(self):
+        raw = [
+            _RawAttribute(name="max_retries", type="Retry", static=True),
+            _RawAttribute(name="max_retries", type="Retry", static=False),
+        ]
+
+        result = _dedupe_attributes(raw)
+
+        assert result == [{"name": "max_retries", "type": "Retry", "static": False}]
+
+    def test_keeps_distinct_names_untouched(self):
+        raw = [
+            _RawAttribute(name="a", type="int", static=False),
+            _RawAttribute(name="b", type="str", static=True),
+        ]
+
+        result = _dedupe_attributes(raw)
+
+        assert result == [
+            {"name": "a", "type": "int", "static": False},
+            {"name": "b", "type": "str", "static": True},
+        ]
+
+    def test_preserves_first_occurrence_order(self):
+        raw = [
+            _RawAttribute(name="z", type="int", static=False),
+            _RawAttribute(name="a", type="int", static=False),
+        ]
+
+        result = _dedupe_attributes(raw)
+
+        assert [a["name"] for a in result] == ["z", "a"]
+
+    def test_normalizes_type_reprs_during_dedupe(self):
+        """`_dedupe_attributes` は最終出力を作るので、format_typeの整形も適用する。"""
+        raw = [_RawAttribute(name="price", type="<class 'float'>", static=False)]
+
+        result = _dedupe_attributes(raw)
+
+        assert result == [{"name": "price", "type": "float", "static": False}]

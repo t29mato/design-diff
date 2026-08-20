@@ -115,6 +115,33 @@ def own_methods(cls: type, *, include_dunder: bool = False) -> list[dict]:
     return methods
 
 
+def _dedupe_attributes(raw_attributes) -> list[dict]:
+    """同名の属性が重複して来た場合に1つへまとめ、format_typeで型を整形する。
+
+    実運用パッケージ(requests.adapters.HTTPAdapter)を実際に解析して発見した回帰:
+    クラス本体で型だけ宣言し(`max_retries: Retry`。値の代入は無い)、`__init__`内で
+    `self.max_retries = ...` と代入する、よくあるPythonのイディオムに対し、py2pumlは
+    同名の属性を「static=True(クラス本体の注釈)」と「static=False(インスタンス
+    属性)」の2つの別属性として重複して返す。値の無いアノテーションは実体のある
+    クラス属性を作らないため(Python自体、`Widget.max_retries`のようにクラス経由で
+    アクセスしても値を持たない)、design-diffの出力では意味のあるインスタンス属性
+    (static=False)を優先して1つにまとめる。
+    """
+    by_name: dict[str, object] = {}
+    order: list[str] = []
+    for attribute in raw_attributes:
+        name = attribute.name
+        if name not in by_name:
+            by_name[name] = attribute
+            order.append(name)
+        elif by_name[name].static and not attribute.static:
+            by_name[name] = attribute
+    return [
+        {"name": by_name[name].name, "type": format_type(by_name[name].type), "static": by_name[name].static}
+        for name in order
+    ]
+
+
 def class_object_for_fqn(fqn: str) -> type:
     """py2pumlのfqn(`<__module__>.<__name__>`)からクラスオブジェクトを再取得する。
 
@@ -157,9 +184,7 @@ def extract_snapshot(root: Path, package: str, *, include_dunder: bool = False) 
             "fqn": fqn,
             "name": item.name,
             "is_abstract": item.is_abstract,
-            "attributes": [
-                {"name": a.name, "type": format_type(a.type), "static": a.static} for a in item.attributes
-            ],
+            "attributes": _dedupe_attributes(item.attributes),
             "methods": methods,
         }
 

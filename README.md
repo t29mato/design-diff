@@ -81,6 +81,14 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
   実行することも、シークレットを渡すこともない。使うのは自動発行される
   `GITHUB_TOKEN` のみ(`permissions: pull-requests: write` で最小権限に絞る)
 
+**現状(private repoの間)**: GitHub Actionsはprivateリポジトリでは課金対象になる
+(publicリポジトリは無料枠が無制限)。design-diffは現在privateのため、
+このワークフローは意図的に「資産としてリポジトリに残してあるが、実行はしない」
+状態にしている。動作自体は自分のgh認証で `python -m design_diff.action.main` を
+手動実行して検証済み(実際にPRにコメントが投稿され、Mermaid図として描画される
+ところまで確認した)。public化した瞬間、このワークフローは追加設定なしに
+無料で自動的に動き出す。
+
 ## JSON出力(LLMO / AIレビュアー向け)
 
 `--format json` は自己完結したJSONを出力する。`mermaid`フィールドに描画済みの
@@ -110,3 +118,35 @@ uv run pytest
 uv run ruff check .
 uv run lint-imports
 ```
+
+### CIはローカルで回す(private repoの間)
+
+**このプロジェクトのCIは現在ローカルで回している。GitHub Actionsのワークフロー
+(`.github/workflows/ci.yml`)は削除せず資産として残してあり、リポジトリを
+public化した瞬間に追加設定なしで無料で自動的に有効になる**設計にしている
+(privateリポジトリではGitHub Actionsが課金対象になるため、当面はそれを避ける)。
+
+ローカルCIは `.github/workflows/ci.yml` と全く同じ順序・同じ判定基準
+(ruff → import-linter → pytest+カバレッジ → ドメイン層カバレッジ90%ゲート)を
+`scripts/ci.sh` として実行する:
+
+```bash
+./scripts/ci.sh
+```
+
+pushする前に自動実行させたい場合は、クローン後に一度だけ以下を実行してフックを
+有効化する(`.git/hooks` はリポジトリに含まれず共有されないため、
+`core.hooksPath` で `.githooks/` を指すようにしている):
+
+```bash
+./scripts/install-hooks.sh
+```
+
+以後 `git push` のたびに `scripts/ci.sh` が自動実行され、失敗すればpushが
+止まる(一時的に無効化したい場合は `git push --no-verify`)。
+
+**self-hosted runnerは採用しない**。理由: (1) 個人アカウントのrunnerはリポジトリ
+単位でしか登録できず管理が煩雑、(2) マシンがスリープしているとジョブが流れない、
+(3) 最大の理由として、**将来このリポジトリをpublicにした際にフォークPRからの
+任意コードが自分のマシン上で実行される危険がある**ため。公開を目指すプロジェクトに
+self-hosted runnerを残すのは危険な組み合わせと判断した。

@@ -704,3 +704,51 @@ MVP実装フェーズで以下をリポジトリ直下に作成する(CLAUDE.md�
 
 以上により、MCPサーバーの実装可否はMVP後の別タスクとして司令塔に提案する。
 本設計フェーズでの結論はここまでとする。
+
+---
+
+## 13. CI基盤の方針(ローカルCI優先・self-hosted runner不採用)
+
+実装フェーズでHQから出た方針決定。GitHub Actionsのワークフロー自体
+(`.github/workflows/ci.yml`, `design-diff-comment.yml`)は完成させたが、
+**design-diffが現在privateリポジトリであるため、GitHub Actionsは実行しない**
+運用にした。
+
+### 13.1 背景
+
+GitHub Actionsはpublicリポジトリでは無料枠が無制限だが、privateリポジトリでは
+課金対象になる。オーナーは課金を避けたいため、private期間中はワークフローを
+「資産として置いておくが動かさない」状態にし、代わりにローカルCIで同水準の
+品質ゲートを担保する。
+
+### 13.2 採用: ローカルCI(`scripts/ci.sh` + pre-pushフック)
+
+- `scripts/ci.sh` は `.github/workflows/ci.yml` と全く同じ順序・同じ判定基準
+  (ruff → import-linter → pytest+カバレッジ → ドメイン層カバレッジ90%ゲート)を
+  実行する。**2つのファイルの内容は同期させておくこと**(片方だけ更新して
+  乖離させない)
+- pre-pushフックは `.githooks/pre-push` に置き、`core.hooksPath` で有効化する
+  (`.git/hooks` はリポジトリに含まれずクローンした人に共有されないため)。
+  有効化手順は `scripts/install-hooks.sh` にまとめ、READMEに手順を明記した
+- `.github/workflows/ci.yml` は**削除しない**。public化した瞬間、追加設定なしに
+  無料で自動的に動き出す資産として維持する
+
+### 13.3 不採用: self-hosted runner(理由を記録)
+
+self-hosted runnerを使えばGitHub Actionsの課金を避けつつワークフローをそのまま
+動かせるが、次の理由で採用しない:
+
+1. 個人アカウントのrunnerはリポジトリ単位でしか登録できず、複数リポジトリを
+   持つ場合の管理が煩雑
+2. マシン(オーナーのMac)がスリープしているとジョブが流れず、CI基盤として
+   信頼性に欠ける
+3. **最大の理由**: design-diffは将来publicにすることを見据えたプロジェクトである
+   (README冒頭のLLMO設計・MCP化構想もその前提)。publicリポジトリでは誰でも
+   PRを送れるため、フォークPRのワークフローがself-hosted runner上で実行される
+   構成になっていると、**任意のコードがオーナーのマシン上で実行される**危険な
+   組み合わせになる。design-diff自身がpy2puml経由でコードをimportして実行する
+   ツールであることも踏まえると(§5.5)、実行環境の分離は特に軽視できない
+
+この判断により、CI実行環境は「GitHub提供のホステッドrunner(public化後は無料)」
+と「ローカルCI(private期間中)」の2択に絞り、self-hosted runnerという第三の
+選択肢は意図的に排除した。

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# pre-pushフック: pushする前にローカルCI(scripts/ci.sh)を実行する。
+# .git/hooks はリポジトリに含まれず共有されないため、core.hooksPath でこの
+# ディレクトリを指す形にしている(有効化は scripts/install-hooks.sh を参照)。
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+"$repo_root/scripts/ci.sh"

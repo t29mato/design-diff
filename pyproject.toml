@@ -3,6 +3,8 @@ name = "design-diff"
 version = "0.1.0"
 description = "Class-level structure diff for Python PRs: Mermaid classDiagram + JSON, for humans and AI reviewers."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "t29mato", email = "tomoya.matou@gmail.com" }
 ]

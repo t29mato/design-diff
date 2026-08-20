@@ -106,6 +106,23 @@ Mermaidブロックも同梱されるため、JSON単体でも人間可読な図
   フォークPRに対して `pull_request_target` を使わず、シークレットも渡さない設計に
   する(詳細は [docs/design/architecture.md](./docs/design/architecture.md) §5.5, §9)
 
+## ライセンス
+
+MIT License。詳細は [LICENSE](./LICENSE) を参照。
+
+依存パッケージのライセンス確認結果(2026-08-20時点、`uv tree` と各パッケージの
+`License-Expression`/`License`メタデータで確認):
+
+| パッケージ | 用途 | ライセンス |
+|---|---|---|
+| py2puml | 実行時(唯一の実行時依存。推移的依存なし) | MIT |
+| import-linter, grimp, click, rich, markdown-it-py, mdurl, pygments, typing-extensions | 開発時のみ(配布物には含まれない) | BSD-2-Clause / MIT / PSF-2.0 |
+| pytest, pytest-cov, coverage, iniconfig, packaging, pluggy | 開発時のみ | MIT / Apache-2.0 |
+| ruff | 開発時のみ | MIT |
+
+いずれも寛容(permissive)なライセンスで、MITとの互換性に問題はない。
+コピーレフト(GPL系)の依存は無い。
+
 ## 開発
 
 設計ドキュメント: [docs/design/architecture.md](./docs/design/architecture.md)

@@ -11,7 +11,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractor
+from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError, Py2pumlExtractor
 from design_diff.adapters.rendering.json_renderer import JsonRenderer
 from design_diff.adapters.rendering.mermaid_renderer import MermaidRenderer
 from design_diff.adapters.rendering.svg_renderer import MermaidCliSvgRenderer, SvgRenderingUnavailableError
@@ -72,12 +72,28 @@ def main(
 
     if args.command == "diff":
         use_case = use_case_factory(args.repo)
-        result = use_case.execute(
-            base_ref=args.base_ref,
-            head_ref=args.head_ref,
-            package=args.package,
-            include_dunder=args.include_dunder,
-        )
+        try:
+            result = use_case.execute(
+                base_ref=args.base_ref,
+                head_ref=args.head_ref,
+                package=args.package,
+                include_dunder=args.include_dunder,
+            )
+        except Py2pumlExtractionError as error:
+            # 実戦テスト(外部の実在パッケージ)で発見した回帰: design-diffは対象コードを
+            # 実際にimportして解析するため、モジュールレベルで実行時コンテキスト依存の
+            # オブジェクト(例: Flaskのcurrent_app/g/requestのようなwerkzeug.local.LocalProxy)
+            # にアクセスするコードがあると、解析全体が例外で落ちる。以前はpy2pumlの生の
+            # 巨大なトレースバックがそのままユーザーの端末に出ていた(クラッシュではなく
+            # 不親切な失敗)。説明を先頭に付けて非ゼロで終了する。
+            print(
+                "対象コードの解析中にエラーが発生しました。design-diffは対象コードを"
+                "実際にimportして解析するため、モジュールレベルで実行時コンテキスト依存の"
+                "オブジェクト(Flaskのcurrent_app等)にアクセスするコードがあると、"
+                "解析全体が失敗することがあります。詳細:\n" + str(error),
+                file=sys.stderr,
+            )
+            return 1
 
         if args.format == "json":
             print(result.json_payload)

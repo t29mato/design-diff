@@ -5,6 +5,7 @@
 from pathlib import Path
 
 from design_diff.action.main import ActionConfig, main, parse_config
+from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError
 from design_diff.application.use_cases.compute_design_diff import DesignDiffResult
 from design_diff.domain.diff import ClassDiff, RelationDiff, SnapshotDiff
 from design_diff.domain.model import ClassIR
@@ -105,6 +106,25 @@ class TestActionMain:
 
         captured = capsys.readouterr()
         assert captured.out.strip() == CANNED_RESULT_WITH_CHANGES.json_payload
+
+    def test_extraction_failure_prints_actionable_error_and_exits_nonzero(self, capsys):
+        """cli/main.pyと同じ回帰対応。PRのコードがモジュールレベルで実行時
+        コンテキスト依存のオブジェクトにアクセスしていると解析全体が失敗しうる。
+        Actionのログに生の巨大なトレースバックではなく分かりやすい説明を残す。
+        """
+
+        class FailingUseCase:
+            def execute(self, pr, base_ref, head_ref, package, *, include_dunder=False):
+                raise Py2pumlExtractionError("py2puml worker failed for path=... : RuntimeError: ...")
+
+        exit_code = main(
+            ["main", "feature", "--package", "pkg", "--pr", "1", "--repo", "owner/repo"],
+            use_case_factory=lambda repo_path, repo_slug: FailingUseCase(),
+        )
+
+        captured = capsys.readouterr()
+        assert exit_code == 1
+        assert "解析中にエラーが発生しました" in captured.err
 
 
 class TestParseConfig:

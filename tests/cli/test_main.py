@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError
 from design_diff.adapters.rendering.svg_renderer import SvgRenderingUnavailableError
 from design_diff.application.use_cases.compute_design_diff import DesignDiffResult
 from design_diff.cli.main import main
@@ -108,6 +109,28 @@ class TestCliDiffCommandWiring:
         captured = capsys.readouterr()
         assert exit_code == 1
         assert "npm install" in captured.err
+
+    def test_extraction_failure_prints_actionable_error_and_exits_nonzero(self, capsys):
+        """実戦テスト(flask)で発見した回帰: 対象コードがモジュールレベルで実行時
+        コンテキスト依存のオブジェクト(Flaskのcurrent_app等のLocalProxy)にアクセス
+        していると、py2pumlの解析全体が例外で落ちる。以前はこの生の巨大な
+        トレースバックがそのままユーザーの端末に出ていた(壊れたのではなく、
+        単に不親切だった)。design-diff自身が分かりやすい説明を先頭に出し、
+        非ゼロで終了することを保証する。
+        """
+
+        class FailingUseCase:
+            def execute(self, base_ref, head_ref, package, *, include_dunder=False):
+                raise Py2pumlExtractionError("py2puml worker failed for path=... : RuntimeError: ...")
+
+        exit_code = main(
+            ["diff", "main", "feature", "--package", "pkg"],
+            use_case_factory=lambda repo_path: FailingUseCase(),
+        )
+
+        captured = capsys.readouterr()
+        assert exit_code == 1
+        assert "解析中にエラーが発生しました" in captured.err
 
     def test_include_dunder_flag_defaults_to_false(self, capsys):
         fake_use_case = FakeUseCase(CANNED_RESULT)

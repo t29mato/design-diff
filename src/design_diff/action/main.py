@@ -20,7 +20,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractor
+from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError, Py2pumlExtractor
 from design_diff.adapters.github.comment_poster import GitHubCommentPoster
 from design_diff.adapters.rendering.json_renderer import JsonRenderer
 from design_diff.adapters.rendering.mermaid_renderer import MermaidRenderer
@@ -95,13 +95,26 @@ def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _defa
     config = parse_config(argv)
 
     use_case = use_case_factory(config.repo_path, config.repo)
-    result = use_case.execute(
-        pr=config.pr,
-        base_ref=config.base_ref,
-        head_ref=config.head_ref,
-        package=config.package,
-        include_dunder=config.include_dunder,
-    )
+    try:
+        result = use_case.execute(
+            pr=config.pr,
+            base_ref=config.base_ref,
+            head_ref=config.head_ref,
+            package=config.package,
+            include_dunder=config.include_dunder,
+        )
+    except Py2pumlExtractionError as error:
+        # cli/main.pyと同じ回帰対応(実戦テストで発見): PRのコードがモジュールレベルで
+        # 実行時コンテキスト依存のオブジェクトにアクセスしていると解析全体が失敗しうる。
+        # Actionのログに生の巨大なトレースバックではなく分かりやすい説明を残す。
+        print(
+            "対象コードの解析中にエラーが発生しました。design-diffは対象コードを"
+            "実際にimportして解析するため、モジュールレベルで実行時コンテキスト依存の"
+            "オブジェクト(Flaskのcurrent_app等)にアクセスするコードがあると、"
+            "解析全体が失敗することがあります。詳細:\n" + str(error),
+            file=sys.stderr,
+        )
+        return 1
     print(result.json_payload)  # ワークフローのログに残す(コメント投稿の有無に関わらず)
     return 0
 

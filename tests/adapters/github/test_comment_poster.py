@@ -10,7 +10,9 @@
 
 import json
 
-from design_diff.adapters.github.comment_poster import _MARKER, GitHubCommentPoster
+import pytest
+
+from design_diff.adapters.github.comment_poster import _MARKER, GitHubCommentError, GitHubCommentPoster
 
 
 class FakeGh:
@@ -103,3 +105,25 @@ class TestGitHubCommentPosterUpdate:
 
         assert len(gh.posted_bodies) == 1
         assert gh.patched == []
+
+
+class TestGitHubCommentPosterErrors:
+    """カバレッジ補強: `gh`コマンドが失敗した場合、GitHubCommentErrorとして
+    分かりやすく再送出されること。
+    """
+
+    def test_raises_github_comment_error_when_gh_command_fails(self):
+        class _Result:
+            returncode = 1
+            stderr = "authentication required"
+            stdout = ""
+
+        def failing_runner(args):
+            return _Result()
+
+        poster = GitHubCommentPoster(repo="owner/repo", runner=failing_runner)
+
+        with pytest.raises(GitHubCommentError) as exc_info:
+            poster.upsert(pr=1, body="something changed")
+
+        assert "authentication required" in str(exc_info.value)

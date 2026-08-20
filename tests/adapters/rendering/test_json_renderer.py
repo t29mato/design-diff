@@ -11,7 +11,7 @@ from design_diff.domain.diff import (
     RelationDiff,
     SnapshotDiff,
 )
-from design_diff.domain.model import AttributeIR, ClassIR, RelationIR, RelationType
+from design_diff.domain.model import AttributeIR, ClassIR, MethodIR, ParameterIR, RelationIR, RelationType
 
 
 def make_class(fqn, attributes=(), methods=()) -> ClassIR:
@@ -111,6 +111,32 @@ class TestJsonRendererClasses:
                 "is_abstract": False,
                 "attributes": [{"name": "capacity_kwh", "type": "float", "static": False}],
                 "methods": [],
+            }
+        ]
+
+    def test_added_class_method_includes_parameter_names_and_types(self):
+        """カバレッジ補強: パラメータを持つメソッドがJSON出力に正しく含まれること
+        (_parameter_to_dict/_method_to_dictが実際に呼ばれる経路)。
+        """
+        cls = make_class(
+            "pkg.Car",
+            methods=(
+                MethodIR(
+                    name="honk",
+                    parameters=(ParameterIR(name="times", type="int"),),
+                    return_type="None",
+                ),
+            ),
+        )
+        diff = SnapshotDiff(classes=ClassDiff(added=(cls,)), relations=RelationDiff())
+
+        payload = json.loads(JsonRenderer().render(diff, meta=META))
+
+        assert payload["classes"]["added"][0]["methods"] == [
+            {
+                "name": "honk",
+                "parameters": [{"name": "times", "type": "int"}],
+                "return_type": "None",
             }
         ]
 

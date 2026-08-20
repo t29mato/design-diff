@@ -271,6 +271,34 @@ class TestRelationDiff:
         assert diff.relations.has_changes is False
 
 
+class TestAttributeAndMethodDiffHasChanges:
+    """カバレッジ補強: AttributeDiff/MethodDiff自身のhas_changesプロパティ
+    (ClassModification.attributes/methodsとして実際に使われる箇所)。
+    """
+
+    def test_attribute_diff_has_changes_true_when_attribute_added(self):
+        base = make_class("pkg.Car")
+        head = make_class("pkg.Car", attributes=[AttributeIR(name="engine", type="Engine")])
+        base_snapshot = make_snapshot(classes=[base])
+        head_snapshot = make_snapshot(classes=[head])
+
+        diff = DiffEngine().diff(base_snapshot, head_snapshot)
+
+        mod = diff.classes.modified[0]
+        assert mod.attributes.has_changes is True
+
+    def test_method_diff_has_changes_true_when_method_added(self):
+        base = make_class("pkg.Car")
+        head = make_class("pkg.Car", methods=[MethodIR(name="honk", parameters=(), return_type="None")])
+        base_snapshot = make_snapshot(classes=[base])
+        head_snapshot = make_snapshot(classes=[head])
+
+        diff = DiffEngine().diff(base_snapshot, head_snapshot)
+
+        mod = diff.classes.modified[0]
+        assert mod.methods.has_changes is True
+
+
 class TestSnapshotDiffHasChanges:
     def test_false_when_nothing_changed(self):
         base = make_snapshot(classes=[make_class("pkg.Car")])

@@ -64,6 +64,17 @@ class TestGitWorktreeVcs:
 
         assert not path.exists()
 
+    def test_cleanup_of_a_path_that_is_not_a_worktree_raises(self, git_repo, tmp_path):
+        """カバレッジ補強: `git worktree remove`自体が失敗するケース
+        (worktreeとして登録されていないパスを渡した場合)。
+        """
+        vcs = GitWorktreeVcs(repo_path=git_repo, worktree_root=tmp_path / "worktrees")
+        not_a_worktree = tmp_path / "not-a-worktree"
+        not_a_worktree.mkdir()
+
+        with pytest.raises(GitWorktreeError):
+            vcs.cleanup(not_a_worktree)
+
     def test_checkout_of_unknown_ref_raises(self, git_repo, tmp_path):
         vcs = GitWorktreeVcs(repo_path=git_repo, worktree_root=tmp_path / "worktrees")
 

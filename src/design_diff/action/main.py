@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractor
@@ -28,6 +29,24 @@ from design_diff.application.use_cases.compute_design_diff import ComputeDesignD
 from design_diff.application.use_cases.post_design_diff_comment import PostDesignDiffCommentUseCase
 
 UseCaseFactory = Callable[[Path | None, str], PostDesignDiffCommentUseCase]
+
+
+@dataclass(frozen=True)
+class ActionConfig:
+    """コマンドライン引数を型付きの値オブジェクトにまとめたもの。
+
+    生の`argparse.Namespace`を引き回すと属性名の綴りミスが実行時までわからない。
+    値オブジェクトにすることで、main()が扱うデータの形をドメイン層のIRと同じ
+    水準で明示する。
+    """
+
+    base_ref: str
+    head_ref: str
+    package: str
+    pr: int
+    repo: str
+    repo_path: Path | None
+    include_dunder: bool
 
 
 def _default_use_case_factory(repo_path: Path | None, repo_slug: str) -> PostDesignDiffCommentUseCase:
@@ -59,17 +78,29 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _default_use_case_factory) -> int:
-    parser = _build_parser()
-    args = parser.parse_args(argv)
-
-    use_case = use_case_factory(args.repo_path, args.repo)
-    result = use_case.execute(
-        pr=args.pr,
+def parse_config(argv: list[str] | None = None) -> ActionConfig:
+    args = _build_parser().parse_args(argv)
+    return ActionConfig(
         base_ref=args.base_ref,
         head_ref=args.head_ref,
         package=args.package,
+        pr=args.pr,
+        repo=args.repo,
+        repo_path=args.repo_path,
         include_dunder=args.include_dunder,
+    )
+
+
+def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _default_use_case_factory) -> int:
+    config = parse_config(argv)
+
+    use_case = use_case_factory(config.repo_path, config.repo)
+    result = use_case.execute(
+        pr=config.pr,
+        base_ref=config.base_ref,
+        head_ref=config.head_ref,
+        package=config.package,
+        include_dunder=config.include_dunder,
     )
     print(result.json_payload)  # ワークフローのログに残す(コメント投稿の有無に関わらず)
     return 0

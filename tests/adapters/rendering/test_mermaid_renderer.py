@@ -252,6 +252,19 @@ class TestMermaidRendererColorStyling:
 
         assert "style pkg_models_Wheel fill:#ffeef0,stroke:#b31d28" in output
 
+    def test_style_line_also_sets_text_color_not_just_background(self):
+        """レビューフィードバック: fill/strokeだけでは、GitHub実機でタイトル・メンバー
+        文字がテーマ既定の薄いグレーのまま残り、色分けの効果が半減する。`color`も
+        指定し、文字自体も状態色になるようにする。
+        """
+        added = make_class("pkg.models.Battery")
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        style_line = next(line for line in output.splitlines() if "style pkg_models_Battery" in line)
+        assert "color:#22863a" in style_line
+
     def test_modified_class_gets_a_yellow_style_line(self):
         base_car = make_class("pkg.models.Car")
         head_car = make_class("pkg.models.Car")

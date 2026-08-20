@@ -46,10 +46,10 @@ classDiagram
             +apply_discount(percent: float, code: Optional[DiscountCode]): float
         }
     }
-    style shop_models_Cart fill:#fff8e6,stroke:#b08800,stroke-width:2px
-    style shop_models_DiscountCode fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style shop_models_LegacyCouponBanner fill:#ffeef0,stroke:#b31d28,stroke-width:2px
-    style shop_models_Product fill:#fff8e6,stroke:#b08800,stroke-width:2px
+    style shop_models_Cart fill:#fff8e6,stroke:#b08800,stroke-width:2px,color:#b08800
+    style shop_models_DiscountCode fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style shop_models_LegacyCouponBanner fill:#ffeef0,stroke:#b31d28,stroke-width:2px,color:#b31d28
+    style shop_models_Product fill:#fff8e6,stroke:#b08800,stroke-width:2px,color:#b08800
     note for shop_models_Cart "+ discount_code: Optional[DiscountCode]\n+ apply_code()"
     note for shop_models_Product "~ apply_discount()"
     shop_models_Cart *-- shop_models_DiscountCode

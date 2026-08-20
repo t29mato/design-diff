@@ -19,6 +19,11 @@
   (ただしGitHub以外での実機確認はまだ行っていない)。ASCIIタグは色だけに頼らない
   ための冗長化として残す(色覚特性やカラー非対応ビューアでも状態が読み取れるように
   するため。JSON出力やnote内の差分表記`+`/`-`/`~`とも記法が一貫する)
+- **`style`文には`color`(文字色)も必ず指定する**。`fill`/`stroke`だけだと背景色と
+  枠線は変わるが、GitHub実機ではタイトル・メンバー文字がテーマ既定の薄いグレーの
+  ままで、色分けの効果が半減する(レビューフィードバックで実際に指摘された)。
+  `stroke`と同じ色を`color`にも指定し、GitHub実機でタイトル・メンバー行とも
+  状態色で塗られることを確認済み
 - **表示ラベルは短いクラス名にし、fqnはノードID(内部識別子)としてのみ使う**。
   fqnをそのままラベルにすると `design_diff.application.use_cases.compute_design_diff.
   ComputeDesignDiffUseCase` のような長大な文字列が並び、図として破綻する。
@@ -271,7 +276,13 @@ class MermaidRenderer:
             if decl.style is None:
                 continue
             fill, stroke = _STYLE_COLOR[decl.style]
-            lines.append(f"    style {decl.node_id} fill:{fill},stroke:{stroke},stroke-width:2px")
+            # color(文字色)を明示しないと、GitHub実機ではラベル/メンバー文字が
+            # テーマ既定の薄いグレーのまま残り、背景色だけが変わって見づらい
+            # (レビューフィードバック: 「背景色はついたけど文字本体は色変わっていない」)。
+            # strokeと同じ色をcolorにも指定し、タイトル・メンバー行とも状態色で統一する。
+            lines.append(
+                f"    style {decl.node_id} fill:{fill},stroke:{stroke},stroke-width:2px,color:{stroke}"
+            )
         return lines
 
     # -- note(差分サマリ) ------------------------------------------------

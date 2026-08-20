@@ -175,26 +175,26 @@ classDiagram
         class design_diff_domain_model_RelationType["RelationType"]
         class design_diff_domain_model_SnapshotIR["SnapshotIR"]
     }
-    style design_diff_action_main_ActionConfig fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_adapters_github_comment_poster_GitHubCommentPoster fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_adapters_rendering_mermaid_renderer_MermaidRenderer fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_adapters_rendering_mermaid_renderer__ChangedClass fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_adapters_rendering_mermaid_renderer__ClassDeclaration fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_adapters_vcs_git_worktree_GitWorktreeVcs fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_application_use_cases_compute_design_diff_ComputeDesignDiffUseCase fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_application_use_cases_compute_design_diff_DesignDiffResult fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_application_use_cases_post_design_diff_comment_PostDesignDiffCommentUseCase fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_diff_AttributeChange fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_diff_AttributeDiff fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_diff_ClassDiff fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_diff_ClassModification fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_diff_DiffEngine fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_diff_MethodChange fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_diff_MethodDiff fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_model_AttributeIR fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_model_ClassIR fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_model_MethodIR fill:#e6ffed,stroke:#22863a,stroke-width:2px
-    style design_diff_domain_model_RelationIR fill:#e6ffed,stroke:#22863a,stroke-width:2px
+    style design_diff_action_main_ActionConfig fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_adapters_github_comment_poster_GitHubCommentPoster fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_adapters_rendering_mermaid_renderer_MermaidRenderer fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_adapters_rendering_mermaid_renderer__ChangedClass fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_adapters_rendering_mermaid_renderer__ClassDeclaration fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_adapters_vcs_git_worktree_GitWorktreeVcs fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_application_use_cases_compute_design_diff_ComputeDesignDiffUseCase fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_application_use_cases_compute_design_diff_DesignDiffResult fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_application_use_cases_post_design_diff_comment_PostDesignDiffCommentUseCase fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_diff_AttributeChange fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_diff_AttributeDiff fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_diff_ClassDiff fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_diff_ClassModification fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_diff_DiffEngine fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_diff_MethodChange fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_diff_MethodDiff fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_model_AttributeIR fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_model_ClassIR fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_model_MethodIR fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
+    style design_diff_domain_model_RelationIR fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
     note "36 classes changed - showing top 20 by impact.\nSee the JSON output for the complete list."
     design_diff_application_use_cases_compute_design_diff_ComputeDesignDiffUseCase *-- design_diff_application_ports_ExtractorPort
     design_diff_application_use_cases_compute_design_diff_ComputeDesignDiffUseCase *-- design_diff_application_ports_RendererPort
@@ -232,5 +232,5 @@ classDiagram
   コンポジション依存が、architecture.md の設計通りに実際のコードから抽出されている
 - プライベートメンバー(`_`始まり)は`-`、公開メンバーは`+`で区別され、
   クラスの公開APIが一目で分かる
-- 追加されたクラスは`style`文で緑色の背景/枠線が付き、ASCIIタグと合わせて
+- 追加されたクラスは`style`文で緑色の背景/枠線/文字色が付き、ASCIIタグと合わせて
   二重に強調される

@@ -1,0 +1,46 @@
+name: design-diff comment
+
+# セキュリティ方針(architecture.md §5.5, §9. READMEにも明記):
+# - pull_request_target は使わない(フォークPRのコードをbaseリポジトリの権限で
+#   実行することになり危険なため。design-diffはpy2puml経由で対象コードを
+#   実際にimportして解析するので、この配慮は特に重要)
+# - フォークPRからのイベントではジョブ自体をスキップする(下のif条件)。
+#   これによりフォークの信頼できないコードに対してpy2pumlのimportベース解析を
+#   一切実行しない。シークレットも渡らない(GITHUB_TOKENのみ使用)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    # フォークからのPRはスキップする(信頼できない対象コードをimportして解析しない)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # git worktreeでbase/head任意のSHAをcheckoutできるよう全履歴を取得する
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Post design diff comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run python -m design_diff.action.main \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            --package design_diff \
+            --pr "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}"

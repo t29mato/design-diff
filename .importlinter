@@ -46,3 +46,4 @@ modules =
     design_diff.adapters.extraction
     design_diff.adapters.vcs
     design_diff.adapters.rendering
+    design_diff.adapters.github

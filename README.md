@@ -28,10 +28,11 @@ design-diff diff main feature/my-branch --package myapp --format mermaid
 ## どこでプレビューするか(重要)
 
 - **GitHubのPRコメント**: GitHubは ```` ```mermaid ```` フェンスで囲まれたコードブロックを
-  ネイティブにクラス図としてレンダリングする。design-diffのGitHub Action(準備中)は
-  この形式でコメントを投稿するので、**追加の設定なしにPR上で絵として見える**。
-  README上のMermaidブロックも同様にGitHub上でプレビューされる
-  (このREADME自体、[docs/examples/](./docs/examples/)のブロックがその実例)
+  ネイティブにクラス図としてレンダリングする。design-diffのGitHub Actionワークフロー
+  (`.github/workflows/design-diff-comment.yml`)はこの形式でコメントを投稿するので、
+  **追加の設定なしにPR上で絵として見える**。README上のMermaidブロックも同様に
+  GitHub上でプレビューされる(このREADME自体、[docs/examples/](./docs/examples/)の
+  ブロックがその実例)
 - **ローカルCLI利用時**: ターミナルにMermaidのテキストが出るだけではプレビューできない。
   次の3つの方法がある:
   1. `--format svg` でSVGを直接出力する(下記参照。要 [mermaid-cli](https://github.com/mermaid-js/mermaid-cli))
@@ -63,6 +64,22 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
   上位20件だけを図示し、省略件数を`note`で明示する。完全な一覧は`--format json`で
 - `--include-dunder` を付けない限り、`__init__`等のダンダーメソッドは表示しない
   (dataclass自動生成やProtocolのボイラープレートで図がノイズだらけになるのを防ぐため)
+
+## GitHub Action(PRコメント自動投稿)
+
+`.github/workflows/design-diff-comment.yml` は、PRのopen/更新のたびにbase...headの
+設計diffを計算し、Mermaidブロックをコメントとして投稿する。
+
+- **コメントはupsertする**: 同一PRで何度pushしても新規コメントは積み上がらず、
+  隠しマーカー(`<!-- design-diff:auto-comment -->`)で見つけた既存コメントを更新する。
+  通知の洪水を避けるため
+- **沈黙原則**: `has_changes` が false(クラス構造に変化なし)のときはコメント自体を
+  投稿しない
+- **セキュリティ**: `pull_request_target` は使わない。フォークからのPRは
+  ジョブ自体をスキップする(`if: github.event.pull_request.head.repo.full_name ==
+  github.repository`)ため、信頼できないコードに対してpy2pumlのimportベース解析を
+  実行することも、シークレットを渡すこともない。使うのは自動発行される
+  `GITHUB_TOKEN` のみ(`permissions: pull-requests: write` で最小権限に絞る)
 
 ## JSON出力(LLMO / AIレビュアー向け)
 

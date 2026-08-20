@@ -15,3 +15,6 @@ class SmokeTestMarker:
     """design-diffのGitHub Action実証用の一時クラス(mainにはマージしない)。"""
 
     label: str
+
+    def describe(self) -> str:
+        return f"smoke-test:{self.label}"

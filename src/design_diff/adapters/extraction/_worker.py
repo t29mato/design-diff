@@ -28,14 +28,14 @@ from py2puml.domain.inspection import Inspection
 from py2puml.domain.umlclass import UmlClass
 from py2puml.inspector import Inspector
 
-# HQフィードバック(表示品質)優先度1: ダンダーメソッドは既定で除外する。
+# レビューフィードバック(表示品質)優先度1: ダンダーメソッドは既定で除外する。
 # dataclassが自動生成する __init__/__eq__/__repr__/__hash__ や、typing.Protocolが
 # 自動生成する __subclasshook__ が全クラスに並び図がノイズだらけになる上、
 # フィールドを1つ足すたびに __init__ が「変更されたメソッド」として報告され、
 # 属性差分(AttributeDiff)と二重計上される。--include-dunder相当のopt-inは残す。
 _DUNDER_RE = re.compile(r"^__.+__$")
 
-# HQフィードバック優先度2: 型表記の正規化。
+# レビューフィードバック優先度2: 型表記の正規化。
 # `<class 'float'>` や `typing.List[pkg.models.Product]` という生のreprを
 # `float` / `List[Product]` のような読める形に整形する。
 _CLASS_REPR_RE = re.compile(r"<(?:class|enum) '([\w.]+)'>")
@@ -64,13 +64,13 @@ def format_type(raw: str | None) -> str | None:
 def own_methods(cls: type, *, include_dunder: bool = False) -> list[dict]:
     """clsが自分で定義したメソッドのみを抽出する(継承分は含まない)。
 
-    HQ指摘1対応: inspect.getmembers(cls, predicate=isfunction)はMRO(継承元)を辿って
+    指摘1対応: inspect.getmembers(cls, predicate=isfunction)はMRO(継承元)を辿って
     基底クラスのメソッドまで返してしまうため使わない。vars(cls)(=cls.__dict__)を直接見て
     自クラス定義分のみに絞る。副産物としてclassmethodの取りこぼしも解消される
     (architecture.md §5.4で実測比較済み)。
 
     `include_dunder=False`(既定)ではダンダーメソッド(`__xxx__`)を除外する
-    (HQフィードバック優先度1)。
+    (レビューフィードバック優先度1)。
     """
     methods: list[dict] = []
     for name, obj in vars(cls).items():

@@ -1,6 +1,6 @@
-"""Protocolベースのポート層 検証スピーク(2026-08-19, HQレビューv2対応)
+"""Protocolベースのポート層 検証スピーク(2026-08-19, 設計レビューv2対応)
 
-HQ指摘2への対応として、ポートを application 層に移し
+レビュー指摘2への対応として、ポートを application 層に移し
 `cli|action -> application -> adapters -> domain` という import-linter の
 layers契約をそのまま敷いた場合、「adapters は application を import できない」
 という制約下でも adapters がポートを実装できるかを検証する。

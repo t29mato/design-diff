@@ -4,7 +4,7 @@ architecture.md §5 の実測で確認した設計判断が実装でも守られ
 - §5.2: symlink未解決パスでもクラスが消えないこと(.resolve()の効果)
 - §5.3: 同一プロセス内で同じpackage名を2回extractしても衝突しないこと
          (サブプロセス分離のリグレッションテスト)
-- §5.4 / HQ指摘1: 継承メソッドを拾わないこと(実際のpy2puml実行を通して)
+- §5.4 / 指摘1: 継承メソッドを拾わないこと(実際のpy2puml実行を通して)
 
 さらに、design-diff自身をdesign-diffで解析する「ドッグフーディング」(CLAUDE.md)を
 実施した際に発見した回帰: src-layout(`src/<package>/...`)のリポジトリでは
@@ -116,10 +116,10 @@ class TestPy2pumlExtractorBasics:
         ]
 
     def test_own_methods_only_car_does_not_include_inherited_drive(self, tmp_path):
-        """HQ指摘1回帰テスト(実プロセス経由)。
+        """指摘1回帰テスト(実プロセス経由)。
 
         既定ではダンダーメソッド(__init__含む)も除外される
-        (HQフィードバック優先度1)。
+        (レビューフィードバック優先度1)。
         """
         package = "extractor_methods_pkg"
         write_package(tmp_path, package, CAR_V1)
@@ -143,7 +143,7 @@ class TestPy2pumlExtractorBasics:
         assert "honk" in method_names
 
     def test_attribute_types_are_formatted_cleanly(self, tmp_path):
-        """HQフィードバック優先度2の回帰テスト(実プロセス経由)。"""
+        """レビューフィードバック優先度2の回帰テスト(実プロセス経由)。"""
         package = "extractor_type_format_pkg"
         write_package(tmp_path, package, CAR_V1)
 

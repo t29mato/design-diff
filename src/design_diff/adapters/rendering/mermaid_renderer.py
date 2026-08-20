@@ -1,6 +1,6 @@
-"""MermaidRenderer。RendererPortの実装。architecture.md §7 + HQフィードバック(表示品質)。
+"""MermaidRenderer。RendererPortの実装。architecture.md §7 + レビューフィードバック(表示品質)。
 
-合格基準(HQ): design-diff自身を解析した図をGitHubのMermaidプレビューに貼り、
+合格基準: design-diff自身を解析した図をGitHubのMermaidプレビューに貼り、
 スクロールせずに「何が増え、何が消え、何が変わり、どの依存が生えたか」が
 一目で分かること。そのための設計判断:
 
@@ -19,7 +19,7 @@
   git diff風の `+`/`-` を安全に使える)
 - 変更のないクラスは出さない(ノイズ削減)。リレーションの参照先が非変更クラスの
   場合のみ、文脈として装飾なしのラベルだけを宣言する
-- **図のサイズ制御(HQ追加要件)**: 変更クラス数が `max_classes`(既定20)を超えたら、
+- **図のサイズ制御(追加要件)**: 変更クラス数が `max_classes`(既定20)を超えたら、
   差分の大きさ(影響度)順に上位N件だけを図示し、残りは`note "..."`
   (標準Mermaid構文)で要約する。Markdown表などは混ぜない
   ―― GitHubのPRコメントプレビューだけでなく、mermaid-cli等によるSVG変換にも
@@ -63,7 +63,7 @@ def _namespace(fqn: str) -> str | None:
 def _visibility(name: str) -> str:
     """Mermaidの可視性マーカー。命名規約に従い、アンダースコア始まりは`-`(private)。
 
-    HQフィードバック: 全メンバーが`+`(public)一色だと、図から公開APIが読み取れない。
+    レビューフィードバック: 全メンバーが`+`(public)一色だと、図から公開APIが読み取れない。
     """
     return "-" if name.startswith("_") else "+"
 
@@ -71,7 +71,7 @@ def _visibility(name: str) -> str:
 def _render_attribute_line(attribute: AttributeIR) -> str:
     marker = _visibility(attribute.name)
     if attribute.type is None:
-        # HQフィードバック: 型注釈が無いだけなのに`None`という偽の型名が出るのを防ぐ。
+        # レビューフィードバック: 型注釈が無いだけなのに`None`という偽の型名が出るのを防ぐ。
         # 型が取れない場合は型部分自体を省略する。
         return f"        {marker}{attribute.name}"
     return f"        {marker}{attribute.name}: {attribute.type}"

@@ -1,6 +1,6 @@
-"""MermaidRenderer のテスト。architecture.md §7 + HQフィードバック(表示品質)。
+"""MermaidRenderer のテスト。architecture.md §7 + レビューフィードバック(表示品質)。
 
-合格基準(HQ): design-diff自身を解析した図をGitHubのMermaidプレビューに貼り、
+合格基準: design-diff自身を解析した図をGitHubのMermaidプレビューに貼り、
 スクロールせずに「何が増え、何が消え、何が変わり、どの依存が生えたか」が
 一目で分かること。そのために:
 
@@ -48,7 +48,7 @@ class TestMermaidRendererStructure:
 
 
 class TestMermaidRendererLabelsAndNamespaces:
-    """HQフィードバック優先度3: ラベル短縮 + namespace記法によるグループ化。"""
+    """レビューフィードバック優先度3: ラベル短縮 + namespace記法によるグループ化。"""
 
     def test_uses_short_class_name_as_the_visible_label(self):
         added = make_class(
@@ -132,7 +132,7 @@ class TestMermaidRendererAddedRemoved:
 
 
 class TestMermaidRendererVisibility:
-    """HQフィードバック(残っている傷1): アンダースコア始まりのメンバーはMermaidの
+    """レビューフィードバック(残っている傷1): アンダースコア始まりのメンバーはMermaidの
     可視性マーカー `-`(private)で描く。既定の`+`(public)一色だと、図から
     公開APIが読み取れない。
     """
@@ -177,7 +177,7 @@ class TestMermaidRendererVisibility:
 
 
 class TestMermaidRendererUntypedMembers:
-    """HQフィードバック(残っている傷2): 型注釈が無い属性が偽の型名`None`として
+    """レビューフィードバック(残っている傷2): 型注釈が無い属性が偽の型名`None`として
     表示される問題。型が取れない場合は型部分自体を省略する。
     """
 
@@ -279,7 +279,7 @@ class TestMermaidRendererRelations:
 
 
 class TestMermaidRendererSizeCap:
-    """HQ追加要件: 図のサイズ制御。変更クラス数が上限を超えたら上位N件のみ図示。"""
+    """追加要件: 図のサイズ制御。変更クラス数が上限を超えたら上位N件のみ図示。"""
 
     def _make_many_added_classes(self, count: int) -> tuple[ClassIR, ...]:
         return tuple(

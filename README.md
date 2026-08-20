@@ -95,16 +95,16 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
 Mermaidブロックも同梱されるため、JSON単体でも人間可読な図をAIレビュアーが
 再現できる。スキーマは [docs/design/architecture.md](./docs/design/architecture.md) §6 を参照。
 
-## 制約(正直に書く)
+## 制約・セキュリティ(Limitations & Security)
 
-- **型アノテーションが無いコードでは依存が出ない**。design-diffはpy2pumlを使って
-  型アノテーションから継承・コンポジション依存を抽出する。型アノテーション文化を
-  促進するツールでもある、と割り切っている
-- **対象コードを実際にimportして解析する**(ASTを静的に読むだけではない)。
-  つまりモジュールレベルの文・デコレータ・メタクラスが実行される。信頼できる
-  自分のリポジトリのコードに対してのみ実行すること。GitHub ActionはフォークPRに
-  対して `pull_request_target` を使わず、シークレットも渡さない設計にする
-  (詳細は [docs/design/architecture.md](./docs/design/architecture.md) §5.5, §9)
+- **Limitations**: **型アノテーションが無いコードでは依存が出ない**。design-diffは
+  py2pumlを使って型アノテーションから継承・コンポジション依存を抽出する。
+  型アノテーション文化を促進するツールでもある、と割り切っている
+- **Security**: **対象コードを実際にimportして解析する**(ASTを静的に読むだけでは
+  ない)。つまりモジュールレベルの文・デコレータ・メタクラスが実行される。
+  信頼できる自分のリポジトリのコードに対してのみ実行すること。GitHub Actionは
+  フォークPRに対して `pull_request_target` を使わず、シークレットも渡さない設計に
+  する(詳細は [docs/design/architecture.md](./docs/design/architecture.md) §5.5, §9)
 
 ## 開発
 

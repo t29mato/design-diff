@@ -1,10 +1,10 @@
 """ワーカー内部ロジック(own_methods等)の単体テスト。サブプロセスを介さず高速に検証する。
 
-HQ指摘1の回帰テスト(architecture.md §5.4)を含む:
+指摘1の回帰テスト(architecture.md §5.4)を含む:
 1. 継承したメソッドを拾わないこと
 2. staticmethod/classmethodを取りこぼさないこと
 
-さらにHQフィードバック(表示品質)の回帰テスト:
+さらにレビューフィードバック(表示品質)の回帰テスト:
 3. ダンダーメソッド(__init__/__eq__/__repr__/__hash__/__subclasshook__等)は既定で除外
    (dataclass自動生成やProtocolのノイズ、および属性差分との二重計上を防ぐ)。
    include_dunder=True で明示的に含められる(--include-dunder相当)。
@@ -61,7 +61,7 @@ class TestOwnMethods:
     def test_excludes_inherited_methods(self):
         methods = own_methods(Car)
         names = {m["name"] for m in methods}
-        assert "drive" not in names, "継承元Vehicleのdriveを拾ってはいけない(HQ指摘1)"
+        assert "drive" not in names, "継承元Vehicleのdriveを拾ってはいけない(指摘1)"
 
     def test_includes_own_instance_method_with_signature(self):
         methods = own_methods(Car)
@@ -88,7 +88,7 @@ class TestOwnMethods:
 
 
 class TestOwnMethodsDunderExclusion:
-    """HQフィードバック優先度1: ダンダーメソッドの除外。"""
+    """レビューフィードバック優先度1: ダンダーメソッドの除外。"""
 
     def test_excludes_dunder_methods_by_default(self):
         methods = own_methods(Vehicle)
@@ -146,7 +146,7 @@ class TestOwnMethodsSelfClsStripping:
 
 
 class TestOwnMethodsTypeFormatting:
-    """HQフィードバック優先度2: 型表記の正規化。
+    """レビューフィードバック優先度2: 型表記の正規化。
 
     フィクスチャクラスはモジュールレベルに定義する(関数ローカルのクラスは
     qualnameに`<locals>`が混じり、モジュール修飾の除去とは別の関心事になるため)。

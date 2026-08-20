@@ -1,11 +1,11 @@
 # design-diff アーキテクチャ設計
 
-ステータス: `need-review`(v2。HQ条件付き合格を受けて改訂。承認まで実装フェーズには進まない)
-作成日: 2026-08-19 / 改訂: 2026-08-19(HQレビュー反映)
+ステータス: 実装済み(この文書はMVP実装完了時点の設計を反映している)
+作成日: 2026-08-19 / 最終改訂: 2026-08-19
 
 ## 0.1 改訂履歴(v1 → v2)
 
-HQ条件付き合格(指摘1〜3)を全面採用した。反論はしていない。
+設計レビューで出た指摘1〜3を全面的に反映した。
 
 | # | 指摘 | 対応 |
 |---|---|---|
@@ -37,7 +37,7 @@ MVPが扱うのは **クラス・属性・メソッド・継承・コンポジ�
 
 ## 2. レイヤー構成(v2: application層を追加)
 
-v1では4つのポート(interface)を domain に置いていたが、HQ指摘の通り
+v1では4つのポート(interface)を domain に置いていたが、レビューでの指摘の通り
 **DiffEngineはどのポートも呼ばない**(SnapshotIRを2つ受け取ってSnapshotDiffを返すだけの
 純粋関数的ロジック)。ポートを必要とするのはオーケストレーション(ユースケース)であって
 ドメインではないため、**application層を新設してポートとユースケースをそこに移した**。
@@ -134,7 +134,7 @@ classDiagram
   すべて `typing.Protocol`)と、`use_cases/`(`ComputeDesignDiffUseCase` /
   `PostDesignDiffCommentUseCase`)。domain のみに依存し、adapters を import しない。
   「どのポートをどの順で呼ぶか」というオーケストレーションはここに閉じ込め、
-  CLI/Actionからロジックを追い出す(HQ指摘2の核心)。
+  CLI/Actionからロジックを追い出す(指摘2の核心)。
 - **adapters/**: ポートの実装。`extraction/`(py2puml)、`vcs/`(git worktree)、
   `rendering/`(Mermaid・JSON)、`github/`(PRコメント upsert)。
   相互に import しない(extraction が rendering を知る必要はない)。
@@ -142,7 +142,7 @@ classDiagram
   (IRオブジェクトを組み立てる必要があるため)。
 - **composition root**(`cli/` と `action/`): 引数解析・環境変数読み取りと、
   アダプタ実装を選んでユースケースに注入する薄い殻。ロジックを持たない
-  (HQ指摘2「CLI/Actionは引数解析と注入だけ」を反映)。ここだけが application と
+  (指摘2「CLI/Actionは引数解析と注入だけ」を反映)。ここだけが application と
   adapters の両方を知ってよい。
 
 ### 2.1 ユースケースの分離
@@ -157,11 +157,11 @@ classDiagram
   composition rootにif文を書かせない)。
 - E2E(実際のgit worktree・実際のpy2puml実行)を待たずに、
   フェイクの `VcsPort`/`ExtractorPort`/`RendererPort` 実装を注入した
-  ユースケース単体テストが書ける(HQ指摘2「TDDの回しやすさが段違い」に対応)。
+  ユースケース単体テストが書ける(指摘2「TDDの回しやすさが段違い」に対応)。
 
 ### 2.2 なぜポートを Protocol にしたか(ABCではなく)
 
-HQ提案の4層順序(`cli|action → application → adapters → domain`)を import-linter の
+レビューで決まった4層順序(`cli|action → application → adapters → domain`)を import-linter の
 `layers` 契約にそのまま採用すると、**adapters は application を import できない**
 (layers契約は「上位は下位をimportしてよいが逆は不可」であり、この並びでは adapters は
 application より下位になるため)。これは一見、「adaptersがapplicationのポートを
@@ -169,7 +169,7 @@ application より下位になるため)。これは一見、「adaptersがappli
 **`typing.Protocol` による構造的部分型を使えば adapters は application を1行も
 import せずにポートを満たせる**ことを実測で確認した
 (`docs/design/spikes/protocol_layering_verification.py`)。
-これにより、HQ提案の層順序をそのまま import-linter で機械的に強制でき、かつ
+これにより、レビューで決まった層順序をそのまま import-linter で機械的に強制でき、かつ
 DIPの精神(=applicationは具体的な実装を知らない)も正しく守られる。
 composition root(cli/action)だけが両方をimportして束ねる。
 
@@ -238,7 +238,7 @@ py2puml 自体が `items_by_fqn: Dict[str, UmlItem]` という形で fqn をキ�
 内部APIには依存しない別処理であり、「py2puml依存を閉じ込める」というCLAUDE.mdの
 方針には抵触しない(同じ extraction アダプタ内に閉じ込まっている)。
 
-**HQ指摘1(必須修正・v2で反映)**: 当初案の `inspect.getmembers(cls,
+**指摘1(必須修正・v2で反映)**: 当初案の `inspect.getmembers(cls,
 predicate=inspect.isfunction)` は **MRO(継承元)を辿って基底クラスのメソッドまで
 返してしまう**ことを実測で確認した(§5.4)。このままdiffの判定単位に使うと、
 
@@ -252,7 +252,7 @@ predicate=inspect.isfunction)` は **MRO(継承元)を辿って基底クラス�
 副産物として `classmethod` の取りこぼしも解消された)。
 **継承メソッドをMermaid図に「参考情報として」出すかどうかは別問題として保留してよいが、
 少なくとも diff(added/removed/changed)の判定は必ず自クラス定義分のみで行う**
-(HQ指摘1の必須要件)。
+(指摘1の必須要件)。
 
 ### 3.3 リレーションの表現
 
@@ -393,7 +393,7 @@ base/head それぞれを**別プロセス**で抽出する(`subprocess` でワ�
 呼び出し元の `ComputeDesignDiffUseCase`(§2.1)が base/head で2回呼ぶ設計とする
 (アダプタ内部でプロセス分離を隠蔽する)。
 
-### 5.4 メソッド抽出(py2pumlの範囲外の補助実装、HQ指摘1でv2改訂)
+### 5.4 メソッド抽出(py2pumlの範囲外の補助実装、指摘1でv2改訂)
 
 py2puml の `UmlClass` は `attributes` のみを持ち、メソッド一覧は含まない
 (`domain/umlclass.py` のデータクラス定義で確認)。標準ライブラリでの代替を実測:
@@ -444,7 +444,7 @@ def own_methods(cls: type) -> list[MethodIR]:
 使って、この `inspect` ベースの補助抽出を同じサブプロセス内で追加実行し、
 `MethodIR` を埋める(§3.2)。
 
-**回帰テスト(実装フェーズでTDDの対象とする。HQ指摘1「回帰テストも必須」に対応)**:
+**回帰テスト(実装フェーズでTDDの対象とする。指摘1「回帰テストも必須」に対応)**:
 
 1. `Vehicle.drive` を持つ `Car(Vehicle)` を解析 → `Car` の `methods` に `drive` が
    含まれない(継承メソッドを拾わないことの確認)
@@ -463,9 +463,9 @@ def own_methods(cls: type) -> list[MethodIR]:
 明記しておく)。MVPでは「organizationの自リポジトリのPRに対して実行する」ことを
 前提とし、フォークPR(外部コントリビュータ)からの実行は**GitHub Actionの権限設計で
 別途ガードする**(例: `pull_request_target` を安易に使わない、シークレットを渡さない)。
-この点は §9 リスクにも記載し、Action実装フェーズで司令塔に再確認する。
+この点は §9 リスクにも記載し、Action実装フェーズで改めて確認する。
 
-**HQレビューでの承認条件(v2追記)**: 上記方針をHQが承認。条件は (a) `pull_request_target`
+**レビューでの承認条件(v2追記)**: 上記方針は承認された。条件は (a) `pull_request_target`
 は使わない (b) フォークPRにはシークレットを渡さない (c) この制約をREADMEに正直に明記する
 (隠さない)。この3条件はAction実装フェーズの受け入れ基準とする(§12.1にも記載)。
 
@@ -536,7 +536,7 @@ AIレビュアーがそのまま読める自己完結JSONを1コマンドで出�
 
 ---
 
-## 8. import-linter 契約案(v2: application層を追加、HQ指摘2反映)
+## 8. import-linter 契約案(v2: application層を追加、指摘2反映)
 
 ```ini
 [importlinter]
@@ -588,20 +588,20 @@ modules =
 ```
 
 `layers` 契約は上位(cli/action)→application→adapters→domainの一方向のみ許可する
-(HQ提案の順序をそのまま採用)。この順序では **adapters は application を
+(レビューで決まった順序をそのまま採用)。この順序では **adapters は application を
 importできない** が、ポートを `typing.Protocol` にすることで adapters は
 application を import せずにポートを満たせる(§2.2で実測確認済み)ため矛盾しない。
 
 `application-purity` 契約は `layers` 契約だけでは拾いきれない抜け道を塞ぐために
 明示的に追加した: `layers` 契約は「adaptersがapplicationをimportできない」ことは
 強制するが、理論上 application が(許可されているはずの)adapters をimportして
-しまう誤り(HQ指摘2が懸念したDIP違反そのもの)を **明示的に禁止**するための
+しまう誤り(指摘2が懸念したDIP違反そのもの)を **明示的に禁止**するための
 `forbidden` 契約。これにより「application はポートの形だけを知り、
 具体的な実装は一切知らない」という設計意図をコード上でも機械的に担保する。
 
 `domain-purity` 契約はドメイン層への第三者ライブラリ混入を機械的に禁止する
 (§5.5のリスクと合わせ、ドメイン層のテスト容易性・90%カバレッジ目標を担保する土台になる)。
-CIでこの設定を緩めることは司令塔承認なしに行わない(CLAUDE.md方針の通り)。
+CIでこの設定を緩めることはレビューを経ずに行わない(CLAUDE.md方針の通り)。
 
 ---
 
@@ -611,22 +611,22 @@ CIでこの設定を緩めることは司令塔承認なしに行わない(CLAUD
 |---|---|---|
 | プロセス分離漏れ | base/headを同一プロセスでinspectすると無言で結果が壊れる(§5.3実測) | `ExtractorPort`実装は1呼び出し1スナップショット固定、サブプロセス必須。ユニットテストで「同一プロセスで2回呼んだら例外/検知」のガードを入れることを検討 |
 | パス未解決 | symlink未解決パスで無言でクラス消失(§5.2実測) | アダプタ内で必ず`.resolve()`。回帰テストをdocs/design/spikesのシナリオをベースに追加 |
-| 対象コードの実行 | py2pumlはimport_moduleで対象コードを実行する(§5.5) | MVPは自リポジトリPR限定でHQ承認済み。条件: `pull_request_target`不使用/フォークPRにシークレット非付与/READMEに明記(§5.5, §12.1) |
+| 対象コードの実行 | py2pumlはimport_moduleで対象コードを実行する(§5.5) | MVPは自リポジトリPR限定で承認済み。条件: `pull_request_target`不使用/フォークPRにシークレット非付与/READMEに明記(§5.5, §12.1) |
 | 型アノテーションなしコードで依存が出ない | py2pumlは型アノテーション起点で依存を抽出 | READMEに正直に明記(CLAUDE.md既定方針どおり) |
-| メソッド抽出の継承漏れ(HQ指摘1) | `inspect.getmembers`は基底クラスのメソッドまで拾い、図のノイズ・modified誤検出の原因になる(§3.2, §5.4実測) | `vars(cls)`方式で自クラス定義分のみに限定。実装フェーズで§5.4の回帰テスト3件を必須で追加 |
+| メソッド抽出の継承漏れ(指摘1) | `inspect.getmembers`は基底クラスのメソッドまで拾い、図のノイズ・modified誤検出の原因になる(§3.2, §5.4実測) | `vars(cls)`方式で自クラス定義分のみに限定。実装フェーズで§5.4の回帰テスト3件を必須で追加 |
 
 ---
 
 ## 10. 未決事項(実装フェーズで判断が必要)
 
 - CLIフレームワーク(argparse vs Typer)は未決定。実装フェーズで軽量なargparseを既定案とし、
-  必要なら司令塔に確認する
+  必要ならメンテナに確認する
 - サブプロセス間のシリアライズ形式(JSON前提)の詳細スキーマは実装時にドメインIRの
   dataclassから機械的に導出する
-- ~~GitHub Actionのフォークpull_request対応方針~~ → §5.5でHQ承認済み(3条件つき)。
+- ~~GitHub Actionのフォークpull_request対応方針~~ → §5.5で承認済み(3条件つき)。
   Action実装フェーズで3条件(`pull_request_target`不使用/シークレット非付与/README明記)を
   満たしているかチェックリストとして再確認するのみ
-- ~~MCPサーバー化の要否~~ → §12.3でHQ指摘3に対する判断を確定(MVP対象外、post-MVP)
+- ~~MCPサーバー化の要否~~ → §12.3で指摘3に対する判断を確定(MVP対象外、post-MVP)
 
 ---
 
@@ -635,12 +635,12 @@ CIでこの設定を緩めることは司令塔承認なしに行わない(CLAUD
 - `docs/design/spikes/py2puml_verification.py` — py2puml技術検証の再実行可能スクリプト
 - `docs/design/spikes/py2puml_verification_output.txt` — 実行ログ(2026-08-19取得)
 - `docs/design/spikes/protocol_layering_verification.py` — Protocolベースのポート層検証
-  (HQ指摘2対応。§2.2)
+  (指摘2対応。§2.2)
 - `docs/design/spikes/protocol_layering_verification_output.txt` — 実行ログ(2026-08-19取得)
 
 ---
 
-## 12. LLMO(AIファースト)設計(HQ指摘3を反映・新設)
+## 12. LLMO(AIファースト)設計(指摘3を反映・新設)
 
 CLAUDE.mdの「LLMO標準装備」を、README一文・配布ファイル・将来のMCP化という3点に
 具体化する。ミッションの核心が「AIレビュアーが設計差分を読める」ことである以上、
@@ -666,7 +666,7 @@ README最上部(タイトル直下、説明文より前)に、能力・入出力
 - 英語で書く(AIレビュアー・国際的な検索インデックス双方を意識。CLAUDE.mdのナラティブ
   日本語部分とは別に、この1文だけは機械可読性を優先し英語固定とする)
 - 「実行時にコードをimportする」というセキュリティ制約(§5.5)も**この1文の中で**
-  正直に触れる(HQ承認条件(c): 隠さない)
+  正直に触れる(承認条件(c): 隠さない)
 
 ### 12.2 llms.txt / AGENTS.md / SKILL.md
 
@@ -690,7 +690,7 @@ MVP実装フェーズで以下をリポジトリ直下に作成する(CLAUDE.md�
 
 根拠:
 
-- HQ指摘2で導入した `ComputeDesignDiffUseCase`(§2.1)は、CLI引数ともGitHub Action
+- 指摘2で導入した `ComputeDesignDiffUseCase`(§2.1)は、CLI引数ともGitHub Action
   ペイロードとも無関係に、`(base_ref, head_ref, package) -> DesignDiffResult` という
   純粋な形で呼び出せる。`DesignDiffResult` は dataclass であり JSON化も容易(§6のスキーマと直結)。
 - MCPサーバーは技術的には「composition rootの3つ目の実装」(`cli/` `action/` に並ぶ
@@ -702,14 +702,14 @@ MVP実装フェーズで以下をリポジトリ直下に作成する(CLAUDE.md�
 - CLAUDE.mdのMVPスコープ(1: CLI, 2: GitHub Action, 3: LLMO標準装備)にMCPサーバーは
   明示的に列挙されていないため、スコープを勝手に広げない(要らぬ実装コストを避ける)。
 
-以上により、MCPサーバーの実装可否はMVP後の別タスクとして司令塔に提案する。
+以上により、MCPサーバーの実装可否はMVP後の別タスクとして提案する。
 本設計フェーズでの結論はここまでとする。
 
 ---
 
 ## 13. CI基盤の方針(ローカルCI優先・self-hosted runner不採用)
 
-実装フェーズでHQから出た方針決定。GitHub Actionsのワークフロー自体
+実装フェーズで出た方針決定。GitHub Actionsのワークフロー自体
 (`.github/workflows/ci.yml`, `design-diff-comment.yml`)は完成させたが、
 **design-diffが現在privateリポジトリであるため、GitHub Actionsは実行しない**
 運用にした。
@@ -717,7 +717,7 @@ MVP実装フェーズで以下をリポジトリ直下に作成する(CLAUDE.md�
 ### 13.1 背景
 
 GitHub Actionsはpublicリポジトリでは無料枠が無制限だが、privateリポジトリでは
-課金対象になる。オーナーは課金を避けたいため、private期間中はワークフローを
+課金対象になる。メンテナは課金を避けたいため、private期間中はワークフローを
 「資産として置いておくが動かさない」状態にし、代わりにローカルCIで同水準の
 品質ゲートを担保する。
 
@@ -740,12 +740,12 @@ self-hosted runnerを使えばGitHub Actionsの課金を避けつつワークフ
 
 1. 個人アカウントのrunnerはリポジトリ単位でしか登録できず、複数リポジトリを
    持つ場合の管理が煩雑
-2. マシン(オーナーのMac)がスリープしているとジョブが流れず、CI基盤として
+2. マシン(メンテナの開発機)がスリープしているとジョブが流れず、CI基盤として
    信頼性に欠ける
 3. **最大の理由**: design-diffは将来publicにすることを見据えたプロジェクトである
    (README冒頭のLLMO設計・MCP化構想もその前提)。publicリポジトリでは誰でも
    PRを送れるため、フォークPRのワークフローがself-hosted runner上で実行される
-   構成になっていると、**任意のコードがオーナーのマシン上で実行される**危険な
+   構成になっていると、**任意のコードがメンテナのマシン上で実行される**危険な
    組み合わせになる。design-diff自身がpy2puml経由でコードをimportして実行する
    ツールであることも踏まえると(§5.5)、実行環境の分離は特に軽視できない
 

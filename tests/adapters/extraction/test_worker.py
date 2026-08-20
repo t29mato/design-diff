@@ -13,20 +13,10 @@
 """
 
 import typing
+import typing as t  # わざとエイリアスで(clickで実際に発生したパターンの再現)
 from dataclasses import dataclass
 
-from design_diff.adapters.extraction._worker import _dedupe_attributes, format_type, own_methods
-
-
-@dataclass
-class _RawAttribute:
-    """py2pumlのUmlAttribute(name/type/static属性を持つ)の代役。実際のInspectorを
-    経由せずに `_dedupe_attributes` を単体テストするために使う。
-    """
-
-    name: str
-    type: str | None
-    static: bool
+from design_diff.adapters.extraction._worker import format_type, own_attributes, own_methods
 
 
 class Vehicle:
@@ -189,53 +179,107 @@ class TestOwnMethodsTypeFormatting:
         assert find["return_type"] == "Optional[Product]"
 
 
-class TestDedupeAttributes:
-    """実運用パッケージ(requests.adapters.HTTPAdapter)を実際に解析して発見した回帰。
+class Engine:
+    pass
+
+
+class HTTPAdapterLike:
+    """requests.adapters.HTTPAdapter.max_retriesパターンの再現(実際に発生した回帰)。
 
     クラス本体で型だけ宣言し(`max_retries: Retry`。値の代入は無い)、`__init__`内で
-    `self.max_retries = ...` と代入する、よくあるPythonのイディオムに対し、py2pumlは
-    同名の属性を「static=True(クラス本体の注釈)」と「static=False(インスタンス
-    属性)」の2つの別属性として重複して返す。値の無いアノテーションは実体のある
-    クラス属性を作らないため、design-diffの出力では1つにまとめるべき。
+    `self.max_retries = ...`と代入する、よくあるPythonのイディオム。
     """
 
-    def test_merges_duplicate_names_preferring_the_instance_attribute(self):
-        raw = [
-            _RawAttribute(name="max_retries", type="Retry", static=True),
-            _RawAttribute(name="max_retries", type="Retry", static=False),
-        ]
+    max_retries: "Retry"
 
-        result = _dedupe_attributes(raw)
+    def __init__(self, max_retries: "Retry | None" = None):
+        self.max_retries = max_retries
 
-        assert result == [{"name": "max_retries", "type": "Retry", "static": False}]
 
-    def test_keeps_distinct_names_untouched(self):
-        raw = [
-            _RawAttribute(name="a", type="int", static=False),
-            _RawAttribute(name="b", type="str", static=True),
-        ]
+class Retry:
+    pass
 
-        result = _dedupe_attributes(raw)
 
-        assert result == [
-            {"name": "a", "type": "int", "static": False},
-            {"name": "b", "type": "str", "static": True},
-        ]
+class AliasedTypingCar:
+    """clickで実際に発生した回帰の再現: `import typing as t`というエイリアス付き
+    importでの型注釈。py2puml本体はこれを解決できないが、get_type_hints()なら
+    エイリアスに関係なくモジュールのglobalsに対して実際に評価するため解決できる。
+    """
 
-    def test_preserves_first_occurrence_order(self):
-        raw = [
-            _RawAttribute(name="z", type="int", static=False),
-            _RawAttribute(name="a", type="int", static=False),
-        ]
+    parts: t.Dict[str, Engine]  # noqa: UP006 - エイリアス付きimportでのtyping.Dict使用を意図的に再現
 
-        result = _dedupe_attributes(raw)
 
-        assert [a["name"] for a in result] == ["z", "a"]
+@dataclass
+class DataclassCar:
+    engine: Engine
 
-    def test_normalizes_type_reprs_during_dedupe(self):
-        """`_dedupe_attributes` は最終出力を作るので、format_typeの整形も適用する。"""
-        raw = [_RawAttribute(name="price", type="<class 'float'>", static=False)]
 
-        result = _dedupe_attributes(raw)
+class NamedTupleLike(typing.NamedTuple):
+    x: int
+    y: int
 
-        assert result == [{"name": "price", "type": "float", "static": False}]
+
+class ConsoleLike:
+    """richで実際に発生した回帰の再現: 循環import回避のためのTYPE_CHECKING限定
+    importで、実行時に存在しない名前への文字列前方参照。get_type_hints()でも
+    解決できないが、クラッシュせず型を文字列のまま返す(このクラスだけ縮退する)。
+    """
+
+    def __init__(self, live: "NotActuallyImportedAtRuntime" = None):  # noqa: F821
+        self.live = live
+
+
+class TestOwnAttributes:
+    """属性の型解決(自前実装。HQ指摘・実戦テストの回帰対応)。
+
+    py2puml本体はモジュールの実行時名前空間への`getattr()`で型注釈を解決するが、
+    importのエイリアスやTYPE_CHECKING限定importが絡むとクラッシュ/解決失敗する
+    (実戦テストでclick/rich/httpxに対して実際に発生)。design-diffはこの部分を
+    py2pumlに任せず、標準ライブラリのtyping.get_type_hints()で自前解決する。
+    """
+
+    def test_merges_class_level_annotation_with_init_assignment(self):
+        """requests.adapters.HTTPAdapter.max_retriesと同じパターンで、
+        型注釈のみの宣言と__init__代入が別属性として重複しないこと。
+        """
+        attributes = own_attributes(HTTPAdapterLike)
+        max_retries_attrs = [a for a in attributes if a["name"] == "max_retries"]
+        assert len(max_retries_attrs) == 1
+
+    def test_resolves_aliased_typing_import_via_get_type_hints(self):
+        """clickの実際の回帰(import typing as t)。get_type_hints()ならエイリアス
+        があっても正しく解決できる(py2puml本体のgetattr方式では失敗していた)。
+        """
+        attributes = own_attributes(AliasedTypingCar)
+        parts = next(a for a in attributes if a["name"] == "parts")
+        assert parts["type"] == "Dict[str, Engine]"
+
+    def test_dataclass_fields_are_instance_attributes_not_static(self):
+        """dataclassのクラスレベル注釈は、実体としてはインスタンス属性
+        (static=False)。py2pumlのinspect_dataclass_typeと同じ扱いを維持する。
+        """
+        attributes = own_attributes(DataclassCar)
+        engine = next(a for a in attributes if a["name"] == "engine")
+        assert engine["static"] is False
+
+    def test_old_style_namedtuple_fields_are_typed_as_any(self):
+        import collections
+
+        LegacyPoint = collections.namedtuple("LegacyPoint", ["x", "y"])
+        attributes = own_attributes(LegacyPoint)
+        names_and_types = {a["name"]: a["type"] for a in attributes}
+        assert names_and_types == {"x": "Any", "y": "Any"}
+
+    def test_typing_namedtuple_fields_use_their_own_annotations(self):
+        attributes = own_attributes(NamedTupleLike)
+        names_and_types = {a["name"]: a["type"] for a in attributes}
+        assert names_and_types == {"x": "int", "y": "int"}
+
+    def test_gracefully_degrades_when_forward_reference_is_unresolvable(self):
+        """richの実際の回帰(TYPE_CHECKING限定importの文字列前方参照)の再現。
+        解決できない型注釈でもクラッシュせず、このクラスだけ縮退する
+        (型が取れる範囲の文字列で表示される)。
+        """
+        attributes = own_attributes(ConsoleLike)
+        live = next(a for a in attributes if a["name"] == "live")
+        assert live["name"] == "live"  # クラッシュせずここまで到達することが重要

@@ -244,3 +244,70 @@ class TestPy2pumlExtractorErrors:
 
         with pytest.raises(Py2pumlExtractionError):
             Py2pumlExtractor().extract(tmp_path / "does_not_exist", "nope")
+
+
+ALIASED_TYPING_IMPORT = """
+import typing as t
+
+
+class Engine:
+    pass
+
+
+class Car:
+    parts: t.Dict[str, Engine]
+"""
+
+TYPE_CHECKING_FORWARD_REFERENCE = """
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from .live import Live
+
+
+class Console:
+    def __init__(self, live: Optional["Live"] = None):
+        self.live = live
+"""
+
+
+class TestPy2pumlExtractorRealWorldRegressions:
+    """実戦テスト(実在の外部パッケージ)で発見した回帰の、実際のサブプロセス経由
+    (py2pumlの本物のInspectorを一部使う、実装全体)での再現テスト。
+
+    以前はpy2puml本体の型解決ロジック(getattr方式)がこれらのパターンで解析全体を
+    クラッシュさせていた。design-diffは属性の型解決をtyping.get_type_hints()による
+    自前実装に置き換えたことで、クラッシュせず解析を完走できる
+    (詳細: docs/design/investigations/py2puml-resolution-failures-root-cause.md)。
+    """
+
+    def test_aliased_typing_import_does_not_crash_extraction(self, tmp_path):
+        """clickの実際の回帰(import typing as t)。以前はpy2puml本体が
+        `Could not resolve type typing.Dict`というValueErrorで解析全体を落としていた。
+        """
+        package = "regression_aliased_pkg"
+        write_package(tmp_path, package, ALIASED_TYPING_IMPORT)
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package)
+
+        car = snapshot.classes[f"{package}.models.Car"]
+        parts = next(a for a in car.attributes if a.name == "parts")
+        assert parts.type == "Dict[str, Engine]"
+        composition_targets = {
+            r.target_fqn for r in snapshot.relations if r.type == RelationType.COMPOSITION
+        }
+        assert f"{package}.models.Engine" in composition_targets
+
+    def test_type_checking_forward_reference_degrades_gracefully(self, tmp_path):
+        """richの実際の回帰(TYPE_CHECKING限定importの文字列前方参照)。以前は
+        py2puml本体が`Optional["Live"] seems to be an invalid type annotation`と
+        いうValueErrorで解析全体を落としていた。design-diffはクラッシュせず、
+        Consoleクラス自体は完走する(liveの型は解決できず縮退する)。
+        """
+        package = "regression_forward_ref_pkg"
+        write_package(tmp_path, package, TYPE_CHECKING_FORWARD_REFERENCE)
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package)
+
+        console = snapshot.classes[f"{package}.models.Console"]
+        assert {a.name for a in console.attributes} == {"live"}

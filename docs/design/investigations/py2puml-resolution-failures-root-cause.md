@@ -1,5 +1,16 @@
 # py2pumlの型解決が失敗する3パターンの真因(最小再現付き)
 
+> **追記(解決済み)**: 本ドキュメント作成時点では「design-diff側で安全に回避する
+> 方法は見つからなかった」と結論していたが、この結論も司令塔の実機検証により
+> 否定された。`typing.get_type_hints()`を使えば3パターンとも実際に解決できる
+> ことが証明され、design-diffは属性の型解決をpy2puml本体に任せるのを止め、
+> 抽出アダプタ内で自前実装する方向に変更した。以下の本文は「なぜpy2puml本体が
+> 失敗するか」の真因分析としては引き続き正確であり、そのまま歴史的記録として
+> 残す。実際に採用した解決策は
+> [real-world-package-testing.md](./real-world-package-testing.md)の
+> 「第3段階」と、`src/design_diff/adapters/extraction/_worker.py`の
+> モジュールdocstringを参照。
+
 **経緯**: [real-world-package-testing.md](./real-world-package-testing.md)で、
 flask/click/rich/httpxの解析失敗について「`typing.X`形式の型注釈をpy2pumlが
 解決できない」という説明を書いたが、**この説明は不正確だった**。最小再現コードで
@@ -104,7 +115,7 @@ py2pumlの`remove_forward_references()`(`py2puml/parsing/compoundtypesplitter.py
 (`CompoundTypeSplitter`の`IS_COMPOUND_TYPE`正規表現が引用符を許可していないため)。
 
 この関数はpy2pumlのモジュールレベル関数(クロージャではない)であるため、
-文字列リテラルの引用符も剥がすよう拡張する монキーパッチを実際に書いて検証した:
+文字列リテラルの引用符も剥がすよう拡張するモンキーパッチを実際に書いて検証した:
 
 ```python
 import re
@@ -130,7 +141,7 @@ cts.remove_forward_references = patched
 救うが、実戦テストで実際に遭遇した失敗そのものは直さない**。モンキーパッチを
 1つ増やす保守コストに見合わないと判断し、**採用しなかった**。
 
-### design-diffで安全に回避できない理由
+### design-diffで安全に回避できない理由(当時の判断。get_type_hints()採用により解決済み)
 
 - py2pumlの`Inspector.inspect()`は1クラスごとに結果をyieldするストリーミング
   設計ではなく、パッケージ全体を同期的に処理してから最後にまとめてyieldする
@@ -158,7 +169,7 @@ Flaskの`current_app`/`g`/`request`のような`werkzeug.local.LocalProxy`
 **解決対象の型注釈とは無関係に、モジュール内にこの種のオブジェクトが1つでも
 あれば解析全体が落ちる**。
 
-### 回避を試みなかった理由
+### 回避を試みなかった理由(当時の判断。get_type_hints()ベースの自前実装により、この経路自体を通らなくなったため解決済み)
 
 `string_repr`はモジュールレベル関数ではなく`resolve_full_namespace_type`
 メソッド内のローカル関数(クロージャ)であるため、パターン1・2のような
@@ -174,7 +185,7 @@ design-diffが対象コードを実際にimportして解析する設計である
 本質的に解析できない可能性が高い(静的解析だけで完結するツールであれば
 この問題は起きない)。
 
-## まとめ
+## まとめ(当時の判断。最終結果は real-world-package-testing.md 参照)
 
 | パターン | 対象 | 真因 | design-diff側の回避 |
 |---|---|---|---|

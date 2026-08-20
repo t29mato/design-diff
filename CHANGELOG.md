@@ -9,24 +9,38 @@ v0.1.0タグ後、公開前に実施した実戦テスト(実在の外部Python�
 古い未注釈コードベース1つ)で見つかった問題への対応。詳細は
 [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)。
 
+### Changed
+
+- **属性の型解決をpy2puml本体からの自前実装(`typing.get_type_hints()`ベース)に
+  置き換えた**。py2pumlは型注釈を「モジュールの実行時の名前空間から`getattr()`で
+  引く」方式で解決しており、importのエイリアス(`import typing as t`)や循環import
+  回避のための`TYPE_CHECKING`限定importが絡むと解析全体を失敗させていた
+  (実戦テストでflask/click/rich/httpxに対して実際に発生)。`typing.get_type_hints()`
+  はモジュールのglobalsに対して実際に注釈を評価するため、これらのケースも正しく
+  解決できる。クラスの発見(どのクラスが対象パッケージに属するか)は引き続き
+  py2pumlを使うが、属性の型解決とそこから導かれる依存関係の抽出は自前実装に
+  なった。1クラス・1属性ごとに例外を握りつぶし、解決できない場合はそのクラス/
+  属性だけ縮退させる(解析全体は道連れにしない)
+
 ### Fixed
 
 - クラス本体で型だけ宣言し、`__init__`で実際の値を代入する(よくあるPythonの
-  イディオム)属性が、py2pumlの挙動により2行重複して表示されるバグを修正
+  イディオム)属性が、2行重複して表示されるバグを修正
   (`requests.adapters.HTTPAdapter.max_retries`で実際に発生)
-- 対象コードの解析がpy2puml本体の制約で失敗する場合(実行時コンテキスト依存の
-  オブジェクトへのアクセス、importのエイリアス、循環import回避のための
-  TYPE_CHECKING限定importのいずれか)に、生の巨大なトレースバックではなく
-  分かりやすいエラーメッセージを出して非ゼロ終了するようにした
-  (CLI/GitHub Action共通)
+- 対象コードの解析が失敗する場合(Python 3で実行できないコード、対象コード側の
+  予期しない例外等)に、生の巨大なトレースバックではなく分かりやすいエラー
+  メッセージを出して非ゼロ終了するようにした(CLI/GitHub Action共通)
+- パッケージ内の全モジュールを解析する際に`<pkg>.__main__`をimportすると、
+  ガードの無い`__main__.py`(例: `flask/__main__.py`)が実際に実行されてしまう
+  バグを修正(`__main__`モジュールを解析対象から除外)
 
 ### Known Limitations(追加)
 
-- 型注釈が豊富な現代的なパッケージほど、py2puml本体の型注釈解決ロジックの
-  制約に触れやすい(実戦テストでrequests以外の4/5パッケージが解析失敗)。
-  真因は最小再現コードまで絞り込んで検証済み(詳細は
-  [docs/design/investigations/py2puml-resolution-failures-root-cause.md](./docs/design/investigations/py2puml-resolution-failures-root-cause.md))。
-  クラッシュ・無限ループ・異常な長時間実行にはならないことは確認済み
+- Python 3で実行できないコード(Python 2専用構文・モジュール)は解析できない
+  (design-diff自体がPython 3.12+のみ対応のため)
+- 型注釈が豊富な現代的なパッケージに対する実戦テスト(requests/flask/click/
+  rich/httpx)を実施し、全て解析が完走することを確認済み。経緯は
+  [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
 
 ## [0.1.0] - 2026-08-20
 

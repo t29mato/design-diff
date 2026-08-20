@@ -104,18 +104,17 @@ def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _defa
             include_dunder=config.include_dunder,
         )
     except Py2pumlExtractionError as error:
-        # cli/main.pyと同じ回帰対応(実戦テストで発見)。真因は
-        # docs/design/investigations/py2puml-resolution-failures-root-cause.md
-        # に最小再現付きで記録済み(実行時コンテキスト依存オブジェクト、importの
-        # エイリアス、TYPE_CHECKING限定importの3パターン)。Actionのログに生の
+        # cli/main.pyと同じ回帰対応(実戦テストで発見)。属性の型解決は
+        # typing.get_type_hints()ベースの自前実装に置き換え済みで、以前発生していた
+        # 主要な失敗パターン(importのエイリアス・TYPE_CHECKING限定import等)は解消した
+        # (詳細: docs/design/investigations/real-world-package-testing.md)。それでも
+        # 対象コードがPython 3で実行できない場合等は失敗しうる。Actionのログに生の
         # 巨大なトレースバックではなく分かりやすい説明を残す。
         print(
             "対象コードの解析中にエラーが発生しました。design-diffは対象コードを実際に"
-            "importし、py2pumlで型注釈を解析するため、対象パッケージの記法によっては"
-            "解析全体が失敗することがあります(既知の例: 実行時コンテキスト依存の"
-            "オブジェクトへのアクセス[Flaskのcurrent_app等]、importのエイリアス"
-            "[import typing as t等]、循環import回避のためのTYPE_CHECKING限定import)。"
-            "詳細:\n" + str(error),
+            "importして解析するため、対象コードがPython 3で実行できない場合(構文エラー・"
+            "Python 2専用モジュールの参照等)や、対象コード側の予期しない例外により"
+            "解析全体が失敗することがあります。詳細:\n" + str(error),
             file=sys.stderr,
         )
         return 1

@@ -36,6 +36,16 @@
   (Mermaidの `+`/`-` は可視性(public/private)の意味で予約されているため、
   診断結果の追加/削除をメンバー行の先頭に流用しない。noteの中はプレーンテキストなので
   git diff風の `+`/`-` を安全に使える)
+- **メンバー(property/method)単位の増減は、行末のASCIIタグで示す**(レビュー
+  フィードバック: クラス単位の色分けだけでは「どのメンバーが変わったか」が
+  分からない)。`style`文はノード(クラス)単位のスタイリング機構であり、Mermaidの
+  classdiagramにはメンバー行1つ1つに個別のstyleを当てる機構が存在しない。
+  カスタムSVGでのメンバー単位色分けも検討したが、GitHub実機検証で生の`<svg>`タグ・
+  `<img src="data:...">`のいずれもサニタイザーに除去されることを確認しており、
+  GitHub PRコメントへの埋め込み手段としては使えない。そのため追加行の末尾に`[+]`、
+  変更行の末尾に`[~]`(型変更時は`(was: <旧の型>)`も付記)を付け、削除された
+  属性/メソッドもhead時点にはもう存在しないが`[-]`付きで本体の中に追加表示する
+  (note の差分サマリだけでなく、クラス本体を見るだけで変化点が分かるようにする)
 - 変更のないクラスは出さない(ノイズ削減)。リレーションの参照先が非変更クラスの
   場合のみ、文脈として装飾なしのラベルだけを宣言する
 - **図のサイズ制御(追加要件)**: 変更クラス数が `max_classes`(既定20)を超えたら、
@@ -62,6 +72,12 @@ _STYLE_COLOR = {
     "added": ("#e6ffed", "#22863a"),
     "removed": ("#ffeef0", "#b31d28"),
     "modified": ("#fff8e6", "#b08800"),
+}
+
+_MEMBER_DIFF_TAG = {
+    "added": "[+]",
+    "removed": "[-]",
+    "changed": "[~]",
 }
 
 _RELATION_ARROW = {
@@ -136,6 +152,47 @@ class _ClassDeclaration:
 def _class_body(cls: ClassIR) -> list[str]:
     lines = [_render_attribute_line(a) for a in cls.attributes]
     lines.extend(_render_method_line(m) for m in cls.methods)
+    return lines
+
+
+def _modified_class_body(mod: ClassModification) -> list[str]:
+    """変更されたクラスの本体を、メンバー行単位のASCIIタグ付きで組み立てる。
+
+    レビューフィードバック: クラス単位の色分け(style文)だけでは「そのクラスの
+    どのproperty/methodが増えた/減ったか」までは分からない。Mermaidの
+    classDiagramはメンバー行1つ1つにstyle(色)を当てる機構を持たないため、
+    色ではなくASCIIタグ(`[+]`追加/`[-]`削除/`[~]`変更)をメンバー行自体に
+    直接付けることで、クラス本体を見るだけで差分が分かるようにする。
+    削除されたメンバーもhead時点には存在しないが、`[-]`付きでこの本体の中に
+    表示する(これまではnoteだけにしか出ておらず、本体だけでは分からなかった)。
+    """
+    added_attrs = {a.name for a in mod.attributes.added}
+    changed_attrs = {c.name: c for c in mod.attributes.changed}
+    lines = []
+    for attribute in mod.head_class.attributes:
+        line = _render_attribute_line(attribute)
+        if attribute.name in added_attrs:
+            line += f"  {_MEMBER_DIFF_TAG['added']}"
+        elif attribute.name in changed_attrs:
+            old_type = changed_attrs[attribute.name].old_type
+            extra = f" (was: {old_type})" if old_type is not None else ""
+            line += f"  {_MEMBER_DIFF_TAG['changed']}{extra}"
+        lines.append(line)
+    for removed_attr in mod.attributes.removed:
+        lines.append(f"{_render_attribute_line(removed_attr)}  {_MEMBER_DIFF_TAG['removed']}")
+
+    added_methods = {m.name for m in mod.methods.added}
+    changed_methods = {c.name for c in mod.methods.changed}
+    for method in mod.head_class.methods:
+        line = _render_method_line(method)
+        if method.name in added_methods:
+            line += f"  {_MEMBER_DIFF_TAG['added']}"
+        elif method.name in changed_methods:
+            line += f"  {_MEMBER_DIFF_TAG['changed']}"
+        lines.append(line)
+    for removed_method in mod.methods.removed:
+        lines.append(f"{_render_method_line(removed_method)}  {_MEMBER_DIFF_TAG['removed']}")
+
     return lines
 
 
@@ -252,7 +309,7 @@ class MermaidRenderer:
             cls = entry.payload
             return _ClassDeclaration(cls.fqn, "removed", _class_body(cls))
         mod: ClassModification = entry.payload
-        return _ClassDeclaration(mod.fqn, "modified", _class_body(mod.head_class))
+        return _ClassDeclaration(mod.fqn, "modified", _modified_class_body(mod))
 
     def _render_namespaced_declarations(self, declarations: dict[str, _ClassDeclaration]) -> list[str]:
         by_namespace: dict[str | None, list[_ClassDeclaration]] = {}

@@ -23,14 +23,16 @@
 
 from design_diff.adapters.rendering.mermaid_renderer import MermaidRenderer
 from design_diff.domain.diff import (
+    AttributeChange,
     AttributeDiff,
     ClassDiff,
     ClassModification,
+    MethodChange,
     MethodDiff,
     RelationDiff,
     SnapshotDiff,
 )
-from design_diff.domain.model import AttributeIR, ClassIR, MethodIR, RelationIR, RelationType
+from design_diff.domain.model import AttributeIR, ClassIR, MethodIR, ParameterIR, RelationIR, RelationType
 
 EMPTY_DIFF = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff())
 
@@ -78,7 +80,8 @@ class TestMermaidRendererLabelsAndNamespaces:
 
     def test_relation_lines_reference_sanitized_ids_not_raw_fqn(self):
         relation = RelationIR(
-            source_fqn="shop.domain.models.Car", target_fqn="shop.domain.models.Battery",
+            source_fqn="shop.domain.models.Car",
+            target_fqn="shop.domain.models.Battery",
             type=RelationType.COMPOSITION,
         )
         diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
@@ -92,7 +95,8 @@ class TestMermaidRendererLabelsAndNamespaces:
     def test_relation_endpoint_not_in_the_diff_is_declared_as_plain_context_node(self):
         """変更されていないクラスへのリレーションでも、参照先を短いラベルで宣言する。"""
         relation = RelationIR(
-            source_fqn="shop.domain.models.Car", target_fqn="shop.domain.models.Engine",
+            source_fqn="shop.domain.models.Car",
+            target_fqn="shop.domain.models.Engine",
             type=RelationType.COMPOSITION,
         )
         diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
@@ -228,6 +232,160 @@ class TestMermaidRendererModified:
         assert "- wheels" in output
 
 
+class TestMermaidRendererMemberLevelDiff:
+    """レビューフィードバック: クラス単位の色分けだけでは「そのクラスのどの
+    property/methodが増えた/減ったか」が分からない。クラス本体のメンバー行
+    それぞれに、追加/削除/変更を示すASCIIタグを直接付ける。Mermaidの
+    classDiagramはメンバー行単位のstyle(色)を持たないため、色ではなくタグで表現する。
+    """
+
+    def test_added_attribute_gets_a_plus_tag_on_its_own_line(self):
+        base = make_class("pkg.models.Car")
+        head = make_class("pkg.models.Car", attributes=(AttributeIR(name="battery", type="Battery"),))
+        mod = ClassModification(
+            fqn="pkg.models.Car",
+            name="Car",
+            attributes=AttributeDiff(added=(AttributeIR(name="battery", type="Battery"),)),
+            methods=MethodDiff(),
+            base_class=base,
+            head_class=head,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+battery: Battery  [+]" in output
+
+    def test_removed_attribute_is_shown_in_the_class_body_with_a_minus_tag(self):
+        """headにはもう存在しない属性でも、クラス本体の中に`[-]`付きで表示する
+        (これまではnoteだけにしか出ておらず、本体を見ただけでは分からなかった)。
+        """
+        base = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="List[Wheel]"),))
+        head = make_class("pkg.models.Car")
+        mod = ClassModification(
+            fqn="pkg.models.Car",
+            name="Car",
+            attributes=AttributeDiff(removed=(AttributeIR(name="wheels", type="List[Wheel]"),)),
+            methods=MethodDiff(),
+            base_class=base,
+            head_class=head,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+wheels: List[Wheel]  [-]" in output
+
+    def test_changed_attribute_type_gets_a_tilde_tag_with_the_old_type(self):
+        base = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="int"),))
+        head = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="List[Wheel]"),))
+        mod = ClassModification(
+            fqn="pkg.models.Car",
+            name="Car",
+            attributes=AttributeDiff(
+                changed=(
+                    AttributeChange(
+                        name="wheels",
+                        old_type="int",
+                        new_type="List[Wheel]",
+                        old_static=False,
+                        new_static=False,
+                    ),
+                )
+            ),
+            methods=MethodDiff(),
+            base_class=base,
+            head_class=head,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+wheels: List[Wheel]  [~] (was: int)" in output
+
+    def test_unchanged_attribute_has_no_diff_tag(self):
+        unchanged = AttributeIR(name="name", type="str")
+        base = make_class("pkg.models.Car", attributes=(unchanged, AttributeIR(name="wheels", type="int")))
+        head = make_class("pkg.models.Car", attributes=(unchanged,))
+        mod = ClassModification(
+            fqn="pkg.models.Car",
+            name="Car",
+            attributes=AttributeDiff(removed=(AttributeIR(name="wheels", type="int"),)),
+            methods=MethodDiff(),
+            base_class=base,
+            head_class=head,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        line = next(line for line in output.splitlines() if "+name: str" in line)
+        assert "[" not in line  # 未変更メンバーにはタグを付けない
+
+    def test_added_method_gets_a_plus_tag(self):
+        base = make_class("pkg.models.Car")
+        head = make_class(
+            "pkg.models.Car", methods=(MethodIR(name="honk", parameters=(), return_type="None"),)
+        )
+        mod = ClassModification(
+            fqn="pkg.models.Car",
+            name="Car",
+            attributes=AttributeDiff(),
+            methods=MethodDiff(added=(MethodIR(name="honk", parameters=(), return_type="None"),)),
+            base_class=base,
+            head_class=head,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+honk(): None  [+]" in output
+
+    def test_removed_method_is_shown_in_the_class_body_with_a_minus_tag(self):
+        base = make_class(
+            "pkg.models.Car", methods=(MethodIR(name="honk", parameters=(), return_type="None"),)
+        )
+        head = make_class("pkg.models.Car")
+        mod = ClassModification(
+            fqn="pkg.models.Car",
+            name="Car",
+            attributes=AttributeDiff(),
+            methods=MethodDiff(removed=(MethodIR(name="honk", parameters=(), return_type="None"),)),
+            base_class=base,
+            head_class=head,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+honk(): None  [-]" in output
+
+    def test_changed_method_gets_a_tilde_tag(self):
+        old_method = MethodIR(name="apply_discount", parameters=(), return_type="float")
+        new_method = MethodIR(
+            name="apply_discount",
+            parameters=(ParameterIR(name="code", type="str"),),
+            return_type="float",
+        )
+        base = make_class("pkg.models.Product", methods=(old_method,))
+        head = make_class("pkg.models.Product", methods=(new_method,))
+        mod = ClassModification(
+            fqn="pkg.models.Product",
+            name="Product",
+            attributes=AttributeDiff(),
+            methods=MethodDiff(
+                changed=(MethodChange(name="apply_discount", old=old_method, new=new_method),)
+            ),
+            base_class=base,
+            head_class=head,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "+apply_discount(code: str): float  [~]" in output
+
+
 class TestMermaidRendererColorStyling:
     """`style <id> fill:...,stroke:...;` によるノード単位の色付け。
 
@@ -285,7 +443,8 @@ class TestMermaidRendererColorStyling:
     def test_context_only_relation_endpoint_gets_no_style_line(self):
         """変更されていない、文脈上の参照のみのクラスには色を付けない(styleなし=None)。"""
         relation = RelationIR(
-            source_fqn="pkg.models.Car", target_fqn="pkg.models.Engine",
+            source_fqn="pkg.models.Car",
+            target_fqn="pkg.models.Engine",
             type=RelationType.COMPOSITION,
         )
         diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))

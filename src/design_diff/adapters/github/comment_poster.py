@@ -39,7 +39,12 @@ class GitHubCommentPoster:
             self._post(pr, tagged_body)
 
     def _find_existing_comment_id(self, pr: int) -> int | None:
-        result = self._call(["api", f"repos/{self._repo}/issues/{pr}/comments", "-f", "per_page=100"])
+        # 手動検証で発見した実バグ: `gh api` は -f 引数があるとデフォルトでPOSTになる。
+        # 一覧取得(GET)のつもりが新規コメント作成(POST)扱いになり、bodyが無いため
+        # 422エラーになっていた。`-X GET` を明示して防ぐ。
+        result = self._call(
+            ["api", f"repos/{self._repo}/issues/{pr}/comments", "-X", "GET", "-f", "per_page=100"]
+        )
         comments = json.loads(result.stdout or "[]")
         for comment in comments:
             if _MARKER in comment.get("body", ""):

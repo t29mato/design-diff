@@ -33,6 +33,12 @@ class FakeGh:
 
         is_list_call = "-f" in args and args[args.index("-f") + 1] == "per_page=100"
         if is_list_call:
+            # `gh api` は -f/-F 引数があるとデフォルトでPOSTになる。一覧取得は
+            # 明示的に `-X GET` を指定しないと「一覧取得のつもりが新規作成扱いに
+            # なり、bodyが無いので422になる」という実バグを踏む(手動検証で発見)。
+            assert "-X" in args and args[args.index("-X") + 1] == "GET", (
+                "一覧取得には -X GET を明示すること(gh apiは-fがあるとデフォルトでPOSTになる)"
+            )
             return _Result(json.dumps(self.existing_comments))
 
         if "-X" in args and "PATCH" in args:

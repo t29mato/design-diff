@@ -59,7 +59,8 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
 ## 出力の読み方
 
 - `[+]` = 追加されたクラス、`[-]` = 削除されたクラス、`[~]` = 変更されたクラス。
-  (色分けではなくラベルのASCIIタグで示す。理由は下記「表示に関する注記」を参照)
+  ラベルのASCIIタグに加えて、`style`文で実際に色も付く(追加=緑/削除=赤/変更=黄)。
+  詳細は下記「表示に関する注記」を参照
 - 可視性マーカー `+`(public) / `-`(private) で、アンダースコア始まりのメンバーを
   区別する。クラスの公開APIが一目で分かる
 - 変更のないクラスは図に出さない(ノイズ削減)
@@ -68,19 +69,25 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
 - `--include-dunder` を付けない限り、`__init__`等のダンダーメソッドは表示しない
   (dataclass自動生成やProtocolのボイラープレートで図がノイズだらけになるのを防ぐため)
 
-### 表示に関する注記: なぜ色分けではなくASCIIタグなのか
+### 表示に関する注記: 色分けの実現方法
 
-当初はMermaidの`classDef`/`cssClass`による色分け(追加=緑/削除=赤/変更=黄)を
+当初はMermaidの`classDef`+`cssClass`による色分け(追加=緑/削除=赤/変更=黄)を
 実装していたが、GitHubのPRコメントおよびmermaid.live双方で実機検証したところ、
-**classDiagramのcssClassスタイリングが全く反映されない**ことが判明した。
+**classDiagramの`cssClass`スタイリングが全く反映されない**ことが判明した。
 design-diff固有の不具合ではなく、Mermaid本体側の既知の問題
 ([mermaid-js/mermaid#1649](https://github.com/mermaid-js/mermaid/issues/1649))。
 
+その後、ノード単体を対象にする**`style <id> fill:...,stroke:...;`文**(`classDef`/
+`cssClass`とは別のMermaid機構)を検証したところ、GitHubの実機(namespace記法・
+ラベル・メソッド本文と併用した状態)で緑/赤/黄が実際に描画されることを確認できた
+([docs/design/architecture.md](./docs/design/architecture.md) §7参照)。これは
+GitHub固有の裏技ではなく標準Mermaid構文なので、GitLab等の他のMermaid実装でも
+動作する見込みだが、GitHub以外での実機確認はまだ行っていない。
+
 絵文字(🟢/🔴/🟡)による代替も検討したが、環境によって絵文字グリフを持たない場合が
-あり、グローバルな利用を前提にできないため不採用とした。代わりに環境非依存で
-確実に描画されるASCII記号のステータスタグ(`[+]`/`[-]`/`[~]`)を採用している。
-JSON出力やnote内の差分表記とも記法が一貫しており、Mermaid側の不具合が将来直っても
-このタグ表記自体は無意味にならない。
+あり、グローバルな利用を前提にできないため不採用とした。ASCIIタグ(`[+]`/`[-]`/`[~]`)
+は色分けの冗長化として残している(色覚特性やカラー非対応ビューアでも状態が
+読み取れるようにするため)。JSON出力やnote内の差分表記とも記法が一貫している。
 
 ## GitHub Action(PRコメント自動投稿)
 

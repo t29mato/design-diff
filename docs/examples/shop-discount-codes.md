@@ -9,13 +9,16 @@
 - `Cart` / `Product` が変更された(`[~]`) — 何が増減したかは `note` に要約される
 - `Cart *-- DiscountCode` というコンポジション依存が新たに生えた
 
-状態はラベルのASCIIタグ(`[+]`/`[-]`/`[~]`)で示す。当初はMermaidの`classDef`/
-`cssClass`による色分けを検討したが、GitHub・mermaid.live双方の実機検証で
-classDiagramのスタイリングが全く反映されないことを確認した(design-diff固有では
-なくupstream Mermaidの既知の問題。[mermaid-js/mermaid#1649](https://github.com/mermaid-js/mermaid/issues/1649))。
+状態はラベルのASCIIタグ(`[+]`/`[-]`/`[~]`)と、`style`文による実際の色分け
+(追加=緑/削除=赤/変更=黄)の両方で示す。当初はMermaidの`classDef`/`cssClass`による
+色分けを検討したが、GitHub・mermaid.live双方の実機検証でclassDiagramのスタイリングが
+全く反映されないことを確認した(design-diff固有ではなくupstream Mermaidの既知の問題。
+[mermaid-js/mermaid#1649](https://github.com/mermaid-js/mermaid/issues/1649))。
+一方、ノード単体を対象にする`style <id> fill:...,stroke:...;`文は別のMermaid機構であり、
+GitHub実機(namespace記法併用時含む)で緑/赤/黄が実際に描画されることを確認済み。
 絵文字での代替も検討したが、環境によって絵文字グリフを持たない場合がありグローバルな
-利用を想定すると前提にできないため、環境非依存で確実に描画されるASCII記号を採用した
-(JSON出力やnote内の差分表記と同じ`+`/`-`/`~`に統一)。
+利用を想定すると前提にできないため不採用。ASCIIタグは色だけに頼らないための冗長化
+として残している(色覚特性やカラー非対応ビューアでも状態が読み取れるように)。
 
 このMermaidブロックはGitHubのコメント/README上でそのままプレビューされる。
 
@@ -43,6 +46,10 @@ classDiagram
             +apply_discount(percent: float, code: Optional[DiscountCode]): float
         }
     }
+    style shop_models_Cart fill:#fff8e6,stroke:#b08800,stroke-width:2px
+    style shop_models_DiscountCode fill:#e6ffed,stroke:#22863a,stroke-width:2px
+    style shop_models_LegacyCouponBanner fill:#ffeef0,stroke:#b31d28,stroke-width:2px
+    style shop_models_Product fill:#fff8e6,stroke:#b08800,stroke-width:2px
     note for shop_models_Cart "+ discount_code: Optional[DiscountCode]\n+ apply_code()"
     note for shop_models_Product "~ apply_discount()"
     shop_models_Cart *-- shop_models_DiscountCode

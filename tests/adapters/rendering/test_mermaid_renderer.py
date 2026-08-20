@@ -4,14 +4,16 @@
 スクロールせずに「何が増え、何が消え、何が変わり、どの依存が生えたか」が
 一目で分かること。そのために:
 
-- 3状態(追加/削除/変更)を**ASCIIのステータスタグ**(`[+]`/`[-]`/`[~]`)でラベルに前置する。
-  Mermaidの`classDef`/`cssClass`によるclassDiagramのスタイリングは、
-  GitHub・mermaid.live双方の実機検証で全く反映されないことを確認した
-  (upstream Mermaidの既知の問題。https://github.com/mermaid-js/mermaid/issues/1649)。
-  絵文字は視覚的には代替になるが、フォント・環境依存(グローバルな利用を考えると
-  絵文字を持たない環境がある)や「装飾で誤魔化している」印象を避けるため採用しない。
-  JSON出力やnote内の差分表記(`+`/`-`/`~`)と同じ記法に統一し、色に頼らず
-  テキストだけで状態が伝わるようにする(色が付けば併用でボーナス程度の位置づけ)
+- 3状態(追加/削除/変更)を**ASCIIのステータスタグ**(`[+]`/`[-]`/`[~]`)でラベルに前置し、
+  かつ**`style <id> fill:...,stroke:...;`文で実際に色も付ける**(追加=緑/削除=赤/変更=黄)。
+  Mermaidの`classDef`+`cssClass`によるclassDiagramのスタイリングは、GitHub・mermaid.live
+  双方の実機検証で全く反映されないことを確認した(upstream Mermaidの既知の問題。
+  https://github.com/mermaid-js/mermaid/issues/1649)。一方、ノード単体を対象にする
+  `style`文は別のMermaid機構であり、GitHubの実機(namespace記法・ラベル・メソッド本文と
+  併用した状態)で緑/赤/黄が実際に描画されることを確認済み。Mermaid標準構文であり
+  GitHub固有の裏技ではないため、GitLab等の他のMermaid実装でも動作する見込み(ただし
+  GitHub以外での実機確認はまだ)。ASCIIタグは色だけに頼らないための冗長化として残す
+  (色覚特性やカラー非対応ビューアでも状態が読み取れるようにするため)
 - 完全修飾名(fqn)をそのままラベルにしない。短い名前 + namespace記法でグループ化
   (fqnはノードIDとしてのみ使い、表示ラベルは短縮する)
 - 変更のないクラスは出さない(ノイズ削減)
@@ -224,6 +226,60 @@ class TestMermaidRendererModified:
         assert "note for pkg_models_Car" in output
         assert "+ battery" in output  # noteの中に差分サマリ
         assert "- wheels" in output
+
+
+class TestMermaidRendererColorStyling:
+    """`style <id> fill:...,stroke:...;` によるノード単位の色付け。
+
+    classDef/cssClassはGitHub・mermaid.live双方で反映されないことを確認済みだが、
+    `style`文は別機構であり、GitHub実機(namespace併用時も含む)で実際に緑/赤/黄が
+    描画されることを確認済み。architecture.md §7参照。
+    """
+
+    def test_added_class_gets_a_green_style_line(self):
+        added = make_class("pkg.models.Battery")
+        diff = SnapshotDiff(classes=ClassDiff(added=(added,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "style pkg_models_Battery fill:#e6ffed,stroke:#22863a" in output
+
+    def test_removed_class_gets_a_red_style_line(self):
+        removed = make_class("pkg.models.Wheel")
+        diff = SnapshotDiff(classes=ClassDiff(removed=(removed,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "style pkg_models_Wheel fill:#ffeef0,stroke:#b31d28" in output
+
+    def test_modified_class_gets_a_yellow_style_line(self):
+        base_car = make_class("pkg.models.Car")
+        head_car = make_class("pkg.models.Car")
+        mod = ClassModification(
+            fqn="pkg.models.Car",
+            name="Car",
+            attributes=AttributeDiff(),
+            methods=MethodDiff(),
+            base_class=base_car,
+            head_class=head_car,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(modified=(mod,)), relations=RelationDiff())
+
+        output = MermaidRenderer().render(diff)
+
+        assert "style pkg_models_Car fill:#fff8e6,stroke:#b08800" in output
+
+    def test_context_only_relation_endpoint_gets_no_style_line(self):
+        """変更されていない、文脈上の参照のみのクラスには色を付けない(styleなし=None)。"""
+        relation = RelationIR(
+            source_fqn="pkg.models.Car", target_fqn="pkg.models.Engine",
+            type=RelationType.COMPOSITION,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
+
+        output = MermaidRenderer().render(diff)
+
+        assert "style pkg_models_Engine" not in output
 
 
 class TestMermaidRendererUnchanged:

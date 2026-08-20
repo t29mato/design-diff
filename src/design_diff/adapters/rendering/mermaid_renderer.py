@@ -4,16 +4,21 @@
 スクロールせずに「何が増え、何が消え、何が変わり、どの依存が生えたか」が
 一目で分かること。そのための設計判断:
 
-- **3状態はラベルのASCIIステータスタグ(`[+]`追加 / `[-]`削除 / `[~]`変更)で示す**。
+- **3状態はラベルのASCIIステータスタグ(`[+]`追加 / `[-]`削除 / `[~]`変更)+
+  `style`文による実際の色付け(追加=緑 / 削除=赤 / 変更=黄)の両方で示す**。
   当初は`classDef`+`cssClass`による色分けを検討したが、GitHub・mermaid.live双方の
   実機検証で「classDiagramのcssClassスタイリングが全く反映されない」ことを確認した
   (design-diff固有の不具合ではなく、upstream Mermaidの既知の問題。
   https://github.com/mermaid-js/mermaid/issues/1649 )。
   絵文字での代替も検討したが、環境によって絵文字グリフを持たない場合がある
   (グローバルな利用を想定すると前提にできない)ため採用しない。
-  ASCII記号のステータスタグなら環境非依存で確実に描画され、JSON出力やnote内の
-  差分表記(`+`/`-`/`~`)とも記法が一貫する。色付けが将来Mermaid側で直っても、
-  このタグ表記自体は無意味にならない(そのときは色+タグの二重表示になるだけ)
+  一方、ノード単体を対象にする`style <id> fill:...,stroke:...;`文は別の
+  Mermaid機構であり、GitHub実機(namespace記法・ラベル・メソッド本文と併用した
+  状態)で緑/赤/黄が実際に描画されることを確認済み。標準Mermaid構文でありGitHub
+  固有の裏技ではないため、GitLab等の他のMermaid実装でも動作する可能性が高い
+  (ただしGitHub以外での実機確認はまだ行っていない)。ASCIIタグは色だけに頼らない
+  ための冗長化として残す(色覚特性やカラー非対応ビューアでも状態が読み取れるように
+  するため。JSON出力やnote内の差分表記`+`/`-`/`~`とも記法が一貫する)
 - **表示ラベルは短いクラス名にし、fqnはノードID(内部識別子)としてのみ使う**。
   fqnをそのままラベルにすると `design_diff.application.use_cases.compute_design_diff.
   ComputeDesignDiffUseCase` のような長大な文字列が並び、図として破綻する。
@@ -44,6 +49,14 @@ _STATUS_TAG = {
     "added": "[+] ",
     "removed": "[-] ",
     "modified": "[~] ",
+}
+
+# `style <id> fill:<fill>,stroke:<stroke>,stroke-width:2px` として使う(fill, stroke)。
+# GitHub実機(namespace併用時含む)で緑/赤/黄が実際に描画されることを確認済み。
+_STYLE_COLOR = {
+    "added": ("#e6ffed", "#22863a"),
+    "removed": ("#ffeef0", "#b31d28"),
+    "modified": ("#fff8e6", "#b08800"),
 }
 
 _RELATION_ARROW = {
@@ -191,6 +204,7 @@ class MermaidRenderer:
 
         lines = ["classDiagram"]
         lines.extend(self._render_namespaced_declarations(declarations))
+        lines.extend(self._render_style_lines(declarations))
 
         notes = self._collect_notes(selected)
         if capped:
@@ -248,6 +262,16 @@ class MermaidRenderer:
             lines.append("    }")
         for decl in sorted(by_namespace.get(None, []), key=lambda d: d.fqn):
             lines.extend(decl.render())
+        return lines
+
+    def _render_style_lines(self, declarations: dict[str, _ClassDeclaration]) -> list[str]:
+        """追加/削除/変更クラスに`style`文で色を付ける(文脈上の参照のみのクラスは対象外)。"""
+        lines = []
+        for decl in sorted(declarations.values(), key=lambda d: d.fqn):
+            if decl.style is None:
+                continue
+            fill, stroke = _STYLE_COLOR[decl.style]
+            lines.append(f"    style {decl.node_id} fill:{fill},stroke:{stroke},stroke-width:2px")
         return lines
 
     # -- note(差分サマリ) ------------------------------------------------

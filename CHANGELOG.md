@@ -3,6 +3,26 @@
 このプロジェクトは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) と
 [Semantic Versioning](https://semver.org/lang/ja/) に準拠する。
 
+## [Unreleased]
+
+v0.2.0タグ後、PyPI公開承認待ちの間に実施した追加ドッグフーディングの記録。
+
+### Known Limitations(追加)
+
+- **ビルド時にファイルを生成するパッケージ(numpy等)は解析できない場合が
+  ある**。`git worktree add`による生のソースチェックアウトを直接importする
+  ため、ビルドシステムが生成するファイル(バージョン情報モジュール等)に
+  依存するコードはimportに失敗しうる
+- **広いバージョン範囲を比較する場合、base側とhead側で対象パッケージ自身の
+  依存関係の要件が異なることがある**(typerで実際に確認: 新バージョンでは
+  不要になった依存を、古いバージョンのコードはまだ必要としていた)
+
+実在のPythonパッケージ10種類以上(科学計算・Web・CLI・非同期・システム系)に
+対する追加の実戦テストを実施し、クラッシュ・無限ループ・異常な長時間実行が
+無いことを確認した。詳細は
+[docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
+の「第2弾」を参照。
+
 ## [0.2.0] - 2026-08-21
 
 **目玉**: 属性の型解決を、py2puml本体のgetattr方式から標準ライブラリの

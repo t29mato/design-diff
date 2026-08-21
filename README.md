@@ -190,14 +190,27 @@ Mermaidブロックも同梱されるため、JSON単体でも人間可読な図
   案内が出る。GitHub ActionでPRに対して実行する通常の文脈では、対象リポジトリ
   自身のCIで依存が既にインストールされた環境で動かすため、実用上問題になることは
   少ない
-- **実戦テスト済み**: 実在のPythonパッケージ5つ(requests/flask/click/rich/httpx)
-  に対して、各パッケージ自身の依存を正しくインストールした上で実際にdesign-diffを
-  実行し、**全て解析が完走する**ことを確認済み(クラッシュ・無限ループ・異常な
-  長時間実行も無い)。開発途中でflask/click/rich/httpxの4つが解析失敗する問題が
+- **Limitations**: **ビルド時にファイルを生成するパッケージは解析できない場合が
+  ある**(例: numpy)。design-diffは`git worktree add`による生のソース
+  チェックアウトを直接importするため、ビルドシステム(meson等)がビルド時に
+  生成するファイル(バージョン情報モジュール等)に依存するコードはimportに
+  失敗しうる。回避策は無く、既知の制約として記録している
+- **Limitations**: **広いバージョン範囲を比較する場合、base側とhead側で対象
+  パッケージ自身の依存関係の要件が異なることがある**(例: 新しいバージョンでは
+  不要になった依存を、古いバージョンのコードはまだ必要としている)。1つの環境に
+  依存関係をインストールしただけでは両方のバージョンを解析するのに不十分な場合が
+  ある。近いバージョン同士の比較では通常問題にならない
+- **実戦テスト済み**: 実在のPythonパッケージ10種類以上(requests/flask/click/
+  rich/httpx/fastapi/typer/aiohttp/paramiko/numpy、科学計算・Web・CLI・非同期・
+  システム系と性質を変えて検証)に対して、各パッケージ自身の依存を正しく
+  インストールした上で実際にdesign-diffを実行した。ほとんどのケースで解析が
+  完走することを確認済み(クラッシュ・無限ループ・異常な長時間実行は1件も無い。
+  全ケース4秒以内)。開発途中でflask/click/rich/httpxの4つが解析失敗する問題が
   見つかったが、真因(importのエイリアス・循環import回避のためのTYPE_CHECKING
   限定import・実行時コンテキスト依存オブジェクトへのアクセス)を特定し、属性の
   型解決を`typing.get_type_hints()`ベースの自前実装に置き換えることで解決した。
-  詳細な経緯・最小再現コードは
+  母数を増やした追加テストで、上記2件の新しい制約(ビルド時生成ファイル・
+  バージョン間の依存関係の差異)も発見した。詳細な経緯・最小再現コードは
   [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)、
   [docs/design/investigations/py2puml-resolution-failures-root-cause.md](./docs/design/investigations/py2puml-resolution-failures-root-cause.md)
 - **Security**: **対象コードを実際にimportして解析する**(ASTを静的に読むだけでは

@@ -17,8 +17,8 @@ class FakeComputeUseCase:
         self._result = result
         self.calls: list[tuple] = []
 
-    def execute(self, base_ref: str, head_ref: str, package: str, *, include_dunder: bool = False):
-        self.calls.append((base_ref, head_ref, package, include_dunder))
+    def execute(self, base_ref: str, head_ref: str, package: str, *, include_boilerplate: bool = False):
+        self.calls.append((base_ref, head_ref, package, include_boilerplate))
         return self._result
 
 
@@ -70,12 +70,12 @@ class TestPostDesignDiffCommentUseCase:
 
         assert comment_port.upserts == []
 
-    def test_passes_include_dunder_through_to_compute_use_case(self):
+    def test_passes_include_boilerplate_through_to_compute_use_case(self):
         compute_use_case = FakeComputeUseCase(result_without_changes())
         comment_port = FakeCommentPort()
         use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port)
 
-        use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg", include_dunder=True)
+        use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg", include_boilerplate=True)
 
         assert compute_use_case.calls == [("main", "feature", "pkg", True)]
 
@@ -101,7 +101,7 @@ class TestPostDesignDiffCommentUseCase:
                 pass
 
         class FakeExtractor:
-            def extract(self, path, package: str, *, include_dunder: bool = False):
+            def extract(self, path, package: str, *, include_boilerplate: bool = False):
                 if "feature" in str(path):
                     return SnapshotIRWithBattery(package)
                 return SnapshotIREmpty(package)

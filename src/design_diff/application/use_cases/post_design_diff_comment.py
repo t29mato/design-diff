@@ -17,7 +17,7 @@ class _ComputeUseCase(Protocol):
     """ComputeDesignDiffUseCaseと同じ形を要求する(テストではフェイクを注入できるように)。"""
 
     def execute(
-        self, base_ref: str, head_ref: str, package: str, *, include_dunder: bool = False
+        self, base_ref: str, head_ref: str, package: str, *, include_boilerplate: bool = False
     ) -> DesignDiffResult: ...
 
 
@@ -33,10 +33,10 @@ class PostDesignDiffCommentUseCase:
         self._comment_port = comment_port
 
     def execute(
-        self, pr: int, base_ref: str, head_ref: str, package: str, *, include_dunder: bool = False
+        self, pr: int, base_ref: str, head_ref: str, package: str, *, include_boilerplate: bool = False
     ) -> DesignDiffResult:
         result = self._compute_use_case.execute(
-            base_ref=base_ref, head_ref=head_ref, package=package, include_dunder=include_dunder
+            base_ref=base_ref, head_ref=head_ref, package=package, include_boilerplate=include_boilerplate
         )
         if result.diff.has_changes:
             self._comment_port.upsert(pr, _render_comment_body(result))

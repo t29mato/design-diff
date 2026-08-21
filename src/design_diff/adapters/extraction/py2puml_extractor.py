@@ -68,9 +68,14 @@ class Py2pumlExtractionError(RuntimeError):
 
 
 class Py2pumlExtractor:
-    def extract(self, path: Path, package: str, *, include_dunder: bool = False) -> SnapshotIR:
+    def extract(self, path: Path, package: str, *, include_boilerplate: bool = False) -> SnapshotIR:
+        # ExtractorPortの言語非依存な`include_boilerplate`を、このアダプタが
+        # 実際に扱うPython固有の概念(`--include-dunder`)へ翻訳する。
+        # ワーカー(_worker.py)自身のダンダーメソッド周りの語彙はPython固有で
+        # 正しいため変更しない(多言語拡張性の評価。docs/design/
+        # multi-language-extensibility-assessment.md)。
         args = [sys.executable, str(_WORKER_SCRIPT), str(path), package]
-        if include_dunder:
+        if include_boilerplate:
             args.append("--include-dunder")
         result = subprocess.run(args, capture_output=True, text=True)
         if result.returncode != 0:

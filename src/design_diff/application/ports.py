@@ -28,18 +28,27 @@ class VcsPort(Protocol):
 
 
 class ExtractorPort(Protocol):
-    """1スナップショット分のPythonパッケージからSnapshotIRを抽出する。
+    """1スナップショット分の対象コードからSnapshotIRを抽出する。
 
     1回の呼び出しにつき1スナップショットのみを扱う(architecture.md §5.3)。
     base/headの2回呼び出しは呼び出し元(ComputeDesignDiffUseCase)が行う。
+
+    多言語拡張性の評価(docs/design/multi-language-extensibility-assessment.md)
+    で判明した規約: 実装が返す`SnapshotIR`内の`ClassIR.fqn`は、対象言語の実際の
+    パス区切り文字が何であれ**ドット区切りに正規化して返すこと**
+    (`adapters/rendering/mermaid_renderer.py`のnamespaceグループ化・短縮ラベル
+    生成がドット区切りを前提にしているため)。
     """
 
-    def extract(self, path: Path, package: str, *, include_dunder: bool = False) -> SnapshotIR:
+    def extract(self, path: Path, package: str, *, include_boilerplate: bool = False) -> SnapshotIR:
         """SnapshotIRを抽出する。
 
-        `include_dunder=False`(既定)ではダンダーメソッド(`__init__`等)を除外する
-        (HQフィードバック: 表示品質。dataclass自動生成やProtocolのノイズ、
-        属性差分との二重計上を防ぐ)。
+        `include_boilerplate=False`(既定)では、対象言語のエコシステムにおける
+        自動生成・定型的なボイラープレートメンバー(Pythonなら`__init__`等の
+        ダンダーメソッド)を除外する(HQフィードバック: 表示品質。dataclass
+        自動生成やProtocolのノイズ、属性差分との二重計上を防ぐ)。何をボイラー
+        プレートと見なすかは対象言語ごとに異なるため、その判定はこのPortの
+        実装(アダプタ)側の責務とする。
         """
         ...
 

@@ -16,8 +16,8 @@ class FakeUseCase:
         self._result = result
         self.calls: list[tuple] = []
 
-    def execute(self, pr, base_ref, head_ref, package, *, include_dunder=False):
-        self.calls.append((pr, base_ref, head_ref, package, include_dunder))
+    def execute(self, pr, base_ref, head_ref, package, *, include_boilerplate=False):
+        self.calls.append((pr, base_ref, head_ref, package, include_boilerplate))
         return self._result
 
 
@@ -114,7 +114,7 @@ class TestActionMain:
         """
 
         class FailingUseCase:
-            def execute(self, pr, base_ref, head_ref, package, *, include_dunder=False):
+            def execute(self, pr, base_ref, head_ref, package, *, include_boilerplate=False):
                 raise Py2pumlExtractionError("py2puml worker failed for path=... : RuntimeError: ...")
 
         exit_code = main(

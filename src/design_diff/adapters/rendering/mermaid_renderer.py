@@ -88,19 +88,29 @@ _RELATION_ARROW = {
 DEFAULT_MAX_CLASSES = 20
 
 
+# fqn(ExtractorPort.extract()が返すClassIR.fqn)がドット区切りであることを
+# 前提にした処理はここに閉じ込める。多言語拡張性の評価
+# (docs/design/multi-language-extensibility-assessment.md)で判明した通り、
+# 新しい言語のExtractorPort実装はfqnをドット区切りに正規化して返す規約に
+# 従う必要がある(ExtractorPortのdocstringに明記済み)。区切り文字を1箇所に
+# 名前付き定数として集約し、この前提が暗黙のものではなく明示的な契約である
+# ことをコード上でも分かるようにする(振る舞いは変えていない)。
+_FQN_SEPARATOR = "."
+
+
 def _mermaid_id(fqn: str) -> str:
     """fqnからMermaidの識別子として安全なノードIDを作る(ドット区切りをアンダースコアに)。"""
-    return fqn.replace(".", "_")
+    return fqn.replace(_FQN_SEPARATOR, "_")
 
 
 def _short_label(fqn: str) -> str:
-    return fqn.rsplit(".", 1)[-1]
+    return fqn.rsplit(_FQN_SEPARATOR, 1)[-1]
 
 
 def _namespace(fqn: str) -> str | None:
-    if "." not in fqn:
+    if _FQN_SEPARATOR not in fqn:
         return None
-    return fqn.rsplit(".", 1)[0]
+    return fqn.rsplit(_FQN_SEPARATOR, 1)[0]
 
 
 def _visibility(name: str) -> str:

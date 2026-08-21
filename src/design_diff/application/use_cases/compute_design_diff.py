@@ -36,7 +36,7 @@ class ComputeDesignDiffUseCase:
         self._diff_engine = diff_engine or DiffEngine()
 
     def execute(
-        self, base_ref: str, head_ref: str, package: str, *, include_dunder: bool = False
+        self, base_ref: str, head_ref: str, package: str, *, include_boilerplate: bool = False
     ) -> DesignDiffResult:
         base_path = self._vcs.checkout(base_ref)
         head_path = self._vcs.checkout(head_ref)
@@ -44,8 +44,12 @@ class ComputeDesignDiffUseCase:
             # base/headは必ず別々の抽出呼び出しで扱う(同一プロセス内での連続inspectは
             # sys.modulesキャッシュ衝突を起こす。architecture.md §5.3)。
             # プロセス分離はExtractorPortの実装(Py2pumlExtractor)側の責務。
-            base_snapshot = self._extractor.extract(base_path, package, include_dunder=include_dunder)
-            head_snapshot = self._extractor.extract(head_path, package, include_dunder=include_dunder)
+            base_snapshot = self._extractor.extract(
+                base_path, package, include_boilerplate=include_boilerplate
+            )
+            head_snapshot = self._extractor.extract(
+                head_path, package, include_boilerplate=include_boilerplate
+            )
         finally:
             self._vcs.cleanup(base_path)
             self._vcs.cleanup(head_path)

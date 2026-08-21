@@ -135,7 +135,7 @@ class TestPy2pumlExtractorBasics:
         package = "extractor_include_dunder_pkg"
         write_package(tmp_path, package, CAR_V1)
 
-        snapshot = Py2pumlExtractor().extract(tmp_path, package, include_dunder=True)
+        snapshot = Py2pumlExtractor().extract(tmp_path, package, include_boilerplate=True)
 
         car = snapshot.classes[f"{package}.models.Car"]
         method_names = {m.name for m in car.methods}

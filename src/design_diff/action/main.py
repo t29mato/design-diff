@@ -101,7 +101,10 @@ def main(argv: list[str] | None = None, use_case_factory: UseCaseFactory = _defa
             base_ref=config.base_ref,
             head_ref=config.head_ref,
             package=config.package,
-            include_dunder=config.include_dunder,
+            # ActionConfig.include_dunderはPython向けの利用者向け語彙のまま(意図的)。
+            # application層のexecute()へは言語非依存な語彙で渡す
+            # (多言語拡張性の評価。docs/design/multi-language-extensibility-assessment.md)。
+            include_boilerplate=config.include_dunder,
         )
     except Py2pumlExtractionError as error:
         # cli/main.pyと同じ回帰対応(実戦テストで発見)。以前はActionのログに生の

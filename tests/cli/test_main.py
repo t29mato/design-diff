@@ -23,9 +23,9 @@ class FakeUseCase:
         self.calls: list[tuple] = []
 
     def execute(
-        self, base_ref: str, head_ref: str, package: str, *, include_dunder: bool = False
+        self, base_ref: str, head_ref: str, package: str, *, include_boilerplate: bool = False
     ) -> DesignDiffResult:
-        self.calls.append((base_ref, head_ref, package, include_dunder))
+        self.calls.append((base_ref, head_ref, package, include_boilerplate))
         return self._result
 
 
@@ -120,7 +120,7 @@ class TestCliDiffCommandWiring:
         """
 
         class FailingUseCase:
-            def execute(self, base_ref, head_ref, package, *, include_dunder=False):
+            def execute(self, base_ref, head_ref, package, *, include_boilerplate=False):
                 raise Py2pumlExtractionError("py2puml worker failed for path=... : RuntimeError: ...")
 
         exit_code = main(

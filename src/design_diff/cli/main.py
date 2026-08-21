@@ -77,7 +77,11 @@ def main(
                 base_ref=args.base_ref,
                 head_ref=args.head_ref,
                 package=args.package,
-                include_dunder=args.include_dunder,
+                # CLIの--include-dunderはPython向けの利用者向け語彙のまま(意図的。
+                # このコマンドが解析するのは今のところPythonコードのみのため)。
+                # application層のexecute()へは言語非依存な語彙で渡す
+                # (多言語拡張性の評価。docs/design/multi-language-extensibility-assessment.md)。
+                include_boilerplate=args.include_dunder,
             )
         except Py2pumlExtractionError as error:
             # 実戦テスト(外部の実在パッケージ)で発見した回帰。以前はこの種のエラーで

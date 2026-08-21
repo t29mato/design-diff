@@ -1,8 +1,19 @@
-# Python以外の言語への拡張余地の評価(調査のみ、実装はしない)
+# Python以外の言語への拡張余地の評価
 
 **依頼**: ドメイン層とapplication層は言語非依存に作ってあるはずだが、抽出
 アダプタを差し替えれば済むのか、それとも中間表現(IR)に手を入れる必要が
 あるのかを設計面から評価する。TypeScriptを主な検討対象とする。
+
+> **追記(2件とも対応済み)**: 本ドキュメントで見つけた2つの「Python固有の
+> 命名・規約の漏れ」(`include_dunder`という引数名、fqnのドット区切り仮定)は、
+> いずれも司令塔の指示により実際に修正した(振る舞いは変えていない、既存
+> テストは全て通過)。`include_dunder`は`ExtractorPort`/`ComputeDesignDiffUseCase`
+> /`PostDesignDiffCommentUseCase`の各`execute()`/`extract()`で`include_boilerplate`
+> にリネームし、CLI/Action層(利用者向けの`--include-dunder`フラグ、
+> `ActionConfig.include_dunder`)だけがPython向けの語彙のまま残る形にした。
+> fqnのドット区切り仮定は、`ExtractorPort`のdocstringに規約として明記した上で、
+> `mermaid_renderer.py`内の区切り文字を`_FQN_SEPARATOR`という名前付き定数に
+> 集約した。以下の本文は発見時点の記録として残す。
 
 ## 結論(先に)
 
@@ -37,7 +48,7 @@ architecture.md §2.2で既に実測確認済みの設計)。
 
 ## 2. 見つかった2つの「Python固有の漏れ」(いずれもIR変更不要)
 
-### 漏れ1: `include_dunder`というapplication層の引数名
+### 漏れ1: `include_dunder`というapplication層の引数名(対応済み)
 
 `ComputeDesignDiffUseCase.execute(self, base_ref, head_ref, package, *,
 include_dunder: bool = False)`
@@ -55,7 +66,7 @@ include_dunder: bool = False)`
 `include_boilerplate`のような、より汎用的な名前にリネームする)ことになる。
 実害はないが、複数言語対応を本格的に進める場合はリネームを検討する価値がある。
 
-### 漏れ2: MermaidRendererがfqnをドット区切りだと仮定している
+### 漏れ2: MermaidRendererがfqnをドット区切りだと仮定している(対応済み)
 
 `src/design_diff/adapters/rendering/mermaid_renderer.py:96-103`:
 
@@ -135,9 +146,11 @@ importでの型解決の失敗、対象パッケージ自身の依存関係が�
 | 抽出アダプタ(ExtractorPort実装)は新規に書く必要があるか | **必要**。言語ごとの型解決・クラス発見のロジックが本体であり、これ自体は軽くない実装量になる |
 | TypeScriptの場合、Pythonより楽になる部分はあるか | **ある**。TS Compiler APIによる静的型解決は対象コードを実行せずに済み、今回Python側で苦労した問題群(エイリアス・TYPE_CHECKING・依存関係インストール漏れ)が構造的に起きにくい |
 
-## 5. 調査時点のステータス
+## 5. ステータス
 
-調査のみ実施。設計方針の変更・実装着手はしていない。将来TypeScript(または
-他言語)対応に着手する場合は、`docs/design/`に正式な設計ドキュメント
-(`ExtractorPort`実装の詳細設計、fqn規約の明文化、`include_dunder`の
-リネーム要否)を書き、レビューを経ること(CLAUDE.md「設計ファースト」方針)。
+調査は完了し、見つかった2件の命名・規約の漏れ(`include_dunder`→
+`include_boilerplate`へのリネーム、fqnドット区切り規約の明文化)は司令塔の
+指示により実際に修正した(冒頭の追記参照。振る舞いは変えていない、既存
+テストは全て通過)。将来TypeScript(または他言語)対応そのものに着手する
+場合は、`docs/design/`に正式な設計ドキュメント(`ExtractorPort`実装の詳細
+設計)を書き、レビューを経ること(CLAUDE.md「設計ファースト」方針)。

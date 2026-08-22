@@ -194,12 +194,21 @@ Mermaidブロックも同梱されるため、JSON単体でも人間可読な図
   ある**(例: numpy)。design-diffは`git worktree add`による生のソース
   チェックアウトを直接importするため、ビルドシステム(meson等)がビルド時に
   生成するファイル(バージョン情報モジュール等)に依存するコードはimportに
-  失敗しうる。回避策は無く、既知の制約として記録している
+  失敗しうる(最小再現コードで確認済み。詳細は
+  [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md))。
+  回避策は無く、既知の制約として記録している
 - **Limitations**: **広いバージョン範囲を比較する場合、base側とhead側で対象
   パッケージ自身の依存関係の要件が異なることがある**(例: 新しいバージョンでは
   不要になった依存を、古いバージョンのコードはまだ必要としている)。1つの環境に
   依存関係をインストールしただけでは両方のバージョンを解析するのに不十分な場合が
-  ある。近いバージョン同士の比較では通常問題にならない
+  ある(最小再現コードで確認済み)。近いバージョン同士の比較では通常問題にならない
+- **Limitations(未修正・既知の問題)**: **サブモジュールのimport失敗は無言で
+  スキップされ、該当クラスが警告なしに解析結果から消える**(トップレベルの
+  `__init__.py`自体の失敗は従来通りエラーとして表面化する)。1モジュールの
+  失敗で他のモジュールの解析まで止めないための意図した耐障害性の副作用だが、
+  レビュアーが「変更なし」と誤認するリスクがある。原理的には修正可能と考えて
+  おり、対応を検討中([docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
+  参照)
 - **実戦テスト済み**: 実在のPythonパッケージ10種類以上(requests/flask/click/
   rich/httpx/fastapi/typer/aiohttp/paramiko/numpy、科学計算・Web・CLI・非同期・
   システム系と性質を変えて検証)に対して、各パッケージ自身の依存を正しく

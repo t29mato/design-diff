@@ -19,11 +19,12 @@ from design_diff.domain.model import (
 )
 
 
-def make_snapshot(package="pkg", classes=None, relations=None) -> SnapshotIR:
+def make_snapshot(package="pkg", classes=None, relations=None, skipped_modules=()) -> SnapshotIR:
     return SnapshotIR(
         package=package,
         classes={c.fqn: c for c in (classes or [])},
         relations=frozenset(relations or []),
+        skipped_modules=tuple(skipped_modules),
     )
 
 
@@ -316,3 +317,50 @@ class TestSnapshotDiffHasChanges:
         diff = DiffEngine().diff(base, head)
 
         assert diff.has_changes is True
+
+
+class TestSnapshotDiffWarnings:
+    """サブモジュールのimport失敗をwarningsとして伝播する。§4.1の沈黙原則の
+    前提(『沈黙=変更なし』)を守るには、部分解析だった事実も伝わる必要がある。
+    """
+
+    def test_no_warnings_when_neither_snapshot_skipped_anything(self):
+        base = make_snapshot(classes=[make_class("pkg.Car")])
+        head = make_snapshot(classes=[make_class("pkg.Car")])
+
+        diff = DiffEngine().diff(base, head)
+
+        assert diff.warnings == ()
+
+    def test_warning_surfaced_when_only_head_skipped_a_module(self):
+        base = make_snapshot(classes=[make_class("pkg.Car")])
+        head = make_snapshot(classes=[make_class("pkg.Car")], skipped_modules=["pkg.broken"])
+
+        diff = DiffEngine().diff(base, head)
+
+        assert diff.warnings == ("pkg.broken",)
+
+    def test_warning_surfaced_when_only_base_skipped_a_module(self):
+        base = make_snapshot(classes=[make_class("pkg.Car")], skipped_modules=["pkg.broken"])
+        head = make_snapshot(classes=[make_class("pkg.Car")])
+
+        diff = DiffEngine().diff(base, head)
+
+        assert diff.warnings == ("pkg.broken",)
+
+    def test_warnings_from_base_and_head_are_merged_deduplicated_and_sorted(self):
+        base = make_snapshot(skipped_modules=["pkg.b_broken", "pkg.shared_broken"])
+        head = make_snapshot(skipped_modules=["pkg.shared_broken", "pkg.a_broken"])
+
+        diff = DiffEngine().diff(base, head)
+
+        assert diff.warnings == ("pkg.a_broken", "pkg.b_broken", "pkg.shared_broken")
+
+    def test_warnings_do_not_affect_has_changes(self):
+        base = make_snapshot(classes=[make_class("pkg.Car")])
+        head = make_snapshot(classes=[make_class("pkg.Car")], skipped_modules=["pkg.broken"])
+
+        diff = DiffEngine().diff(base, head)
+
+        assert diff.has_changes is False
+        assert diff.warnings == ("pkg.broken",)

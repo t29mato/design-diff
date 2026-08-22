@@ -88,6 +88,12 @@ class RelationDiff:
 class SnapshotDiff:
     classes: ClassDiff
     relations: RelationDiff
+    # base/head いずれかのスナップショットでimportに失敗し、解析対象から除外された
+    # モジュール名(重複排除・ソート済み)。空でない場合、上記のclasses/relations
+    # は対象パッケージ全体を網羅していない(部分解析)。沈黙原則(§4.1)は
+    # 「変更なし かつ 警告なし」の場合のみ成立する(has_changesがFalseでも
+    # warningsが非空ならレビュアーに伝える必要がある)。
+    warnings: tuple[str, ...] = ()
 
     @property
     def has_changes(self) -> bool:
@@ -105,6 +111,7 @@ class DiffEngine:
         return SnapshotDiff(
             classes=self._diff_classes(base.classes, head.classes),
             relations=self._diff_relations(base.relations, head.relations),
+            warnings=tuple(sorted(set(base.skipped_modules) | set(head.skipped_modules))),
         )
 
     def _diff_classes(self, base: Mapping[str, ClassIR], head: Mapping[str, ClassIR]) -> ClassDiff:

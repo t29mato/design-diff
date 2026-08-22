@@ -47,6 +47,16 @@ def result_without_changes() -> DesignDiffResult:
     )
 
 
+def result_without_changes_but_with_warnings() -> DesignDiffResult:
+    return DesignDiffResult(
+        diff=SnapshotDiff(
+            classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",)
+        ),
+        mermaid="classDiagram",
+        json_payload='{"has_changes": false, "warnings": ["pkg.broken"]}',
+    )
+
+
 class TestPostDesignDiffCommentUseCase:
     def test_posts_a_comment_when_there_are_changes(self):
         compute_use_case = FakeComputeUseCase(result_with_changes())
@@ -69,6 +79,18 @@ class TestPostDesignDiffCommentUseCase:
         use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
 
         assert comment_port.upserts == []
+
+    def test_posts_a_comment_when_there_are_no_changes_but_there_are_warnings(self):
+        """沈黙原則の条件変更(HQ指摘): 『変更なし かつ 警告なし』のときだけ
+        沈黙する。警告(部分解析)がある場合は、変更が無くても投稿する。
+        """
+        compute_use_case = FakeComputeUseCase(result_without_changes_but_with_warnings())
+        comment_port = FakeCommentPort()
+        use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port)
+
+        use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
+
+        assert len(comment_port.upserts) == 1
 
     def test_passes_include_boilerplate_through_to_compute_use_case(self):
         compute_use_case = FakeComputeUseCase(result_without_changes())

@@ -154,7 +154,10 @@ classDiagram
 - `PostDesignDiffCommentUseCase.execute(pr, base_ref, head_ref, package) -> None`:
   `ComputeDesignDiffUseCase` を内部で使い、`diff.has_changes` が真の場合のみ
   `CommentPort.upsert()` を呼ぶ(沈黙原則 §4.1 をユースケースのルールとして表現し、
-  composition rootにif文を書かせない)。
+  composition rootにif文を書かせない)。**沈黙するのは `has_changes` が false
+  かつ `diff.warnings` が空の場合のみ**(実戦テストで発見した回帰: サブモジュール
+  のimport失敗が無言でスキップされると、部分解析であるにもかかわらず「変更なし」
+  として沈黙してしまい、沈黙原則の前提『沈黙=変更なし』が崩れる。§4.1参照)。
 - E2E(実際のgit worktree・実際のpy2puml実行)を待たずに、
   フェイクの `VcsPort`/`ExtractorPort`/`RendererPort` 実装を注入した
   ユースケース単体テストが書ける(指摘2「TDDの回しやすさが段違い」に対応)。
@@ -222,7 +225,15 @@ class SnapshotIR:
     package: str
     classes: dict[str, ClassIR]     # key = fqn
     relations: frozenset[RelationIR]
+    skipped_modules: tuple[str, ...] = ()  # importに失敗し除外されたサブモジュール名
 ```
+
+**`skipped_modules`(実戦テストで発見した回帰への対応)**: サブモジュールの
+importに失敗した場合、抽出アダプタは(以前のように)解析全体を止めず、他の
+モジュールの解析を続けるが、失敗したモジュール名をここに記録する。これが
+空でない場合、`classes`/`relations` は対象パッケージ全体を網羅していない
+(部分解析)。`DiffEngine.diff()` は base/head 双方の `skipped_modules` を
+マージして `SnapshotDiff.warnings` とし、沈黙原則(§2.1, §4.1)の判定に使う。
 
 ### 3.1 なぜ fqn をキーにするか
 
@@ -293,6 +304,11 @@ fqnの集合演算のみ:
 - `modified` = 両方に存在し、`ClassIR` が等しくない(dataclassの構造的等価性で判定)fqn
   → 属性差分・メソッド差分・`is_abstract` 変更を個別に算出(4.2, 4.3)
 - 両方に存在し完全一致するクラスは**出力しない**(codiff-action方式の沈黙原則。§2.1, §6)
+- `SnapshotDiff.warnings` = base/head双方の `SnapshotIR.skipped_modules` の和集合
+  (重複排除・ソート済み)。沈黙原則は『沈黙=変更なし』が真であることに依存して
+  おり、部分解析(warningsが非空)を無言のまま扱うとこの前提が壊れるため、
+  沈黙するのは `has_changes` が false **かつ** `warnings` が空の場合のみ
+  (実戦テストで発見した回帰への対応。§2.1参照)
 
 ### 4.2 属性差分(modified クラス内)
 
@@ -482,12 +498,13 @@ AIレビュアーがそのまま読める自己完結JSONを1コマンドで出�
 
 ```jsonc
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "tool": "design-diff",
   "package": "sample",
   "base_ref": "main",
   "head_ref": "feature/xxx",
   "has_changes": true,
+  "warnings": [],
   "summary": {
     "classes_added": 1,
     "classes_removed": 0,
@@ -518,8 +535,14 @@ AIレビュアーがそのまま読める自己完結JSONを1コマンドで出�
 }
 ```
 
-- `has_changes: false` の場合、GitHub Actionはコメントを投稿しない
-  (沈黙原則。`PostDesignDiffCommentUseCase` がこのルールを判定する。§2.1)。
+- `has_changes: false` **かつ** `warnings` が空の場合のみ、GitHub Actionは
+  コメントを投稿しない(沈黙原則。`PostDesignDiffCommentUseCase` がこのルールを
+  判定する。§2.1)。
+- `warnings`(1.0→1.1で追加): サブモジュールのimport失敗でスキップされた
+  モジュール名の一覧(base/head双方の`SnapshotIR.skipped_modules`をマージ・
+  重複排除・ソート済み)。空でない場合、`classes`/`relations`は対象パッケージ
+  全体を網羅していない(部分解析)。実戦テストで発見した回帰(サブモジュールの
+  import失敗が無言でスキップされ、クラスが警告なしに消えていた)への対応。
 - `mermaid` にレンダリング済みのMermaidブロックを文字列として同梱し、
   JSON単体でも人間可読な図をAIレビュアーが再現できるようにする(README冒頭の1文と対になる設計)。
 - `schema_version` はフィールド追加時のみ変更(破壊的変更ではmajorを上げる)。

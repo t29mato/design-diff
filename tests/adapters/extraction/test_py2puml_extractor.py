@@ -313,6 +313,36 @@ class TestPy2pumlExtractorRealWorldRegressions:
         assert {a.name for a in console.attributes} == {"live"}
 
 
+class TestPy2pumlExtractorSkippedModuleWarnings:
+    """発見した問題(実戦テストの副産物): サブモジュールのimport失敗が無言で
+    スキップされ、クラスが警告なしに消えていた。沈黙原則(『沈黙=変更なし』)は
+    この無言スキップに毒されるため、スキップしたモジュール名をSnapshotIR.
+    skipped_modulesとして伝播しなければならない(HQ指摘)。
+    """
+
+    def test_submodule_import_failure_is_recorded_as_a_skipped_module(self, tmp_path):
+        package = "regression_silent_skip_pkg"
+        write_package(tmp_path, package, "class Widget:\n    pass\n")
+        broken_module = tmp_path / package / "broken.py"
+        broken_module.write_text("import some_module_that_is_not_installed\n\nclass Ghost:\n    pass\n")
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package)
+
+        # Widget(models.py)は正常に解析される。Ghost(broken.py)はimport自体が
+        # 失敗するため、以前は無言で消えていたが、今はwarningsとして記録される。
+        assert f"{package}.models.Widget" in snapshot.classes
+        assert not any(fqn.endswith(".Ghost") for fqn in snapshot.classes)
+        assert snapshot.skipped_modules == (f"{package}.broken",)
+
+    def test_no_skipped_modules_when_everything_imports_cleanly(self, tmp_path):
+        package = "regression_no_skip_pkg"
+        write_package(tmp_path, package, CAR_V1)
+
+        snapshot = Py2pumlExtractor().extract(tmp_path, package)
+
+        assert snapshot.skipped_modules == ()
+
+
 class TestPy2pumlExtractionErrorFriendlyMessage:
     """実戦テストの再検証(HQ指摘)で発見した回帰: 解析対象パッケージ自身の実行時
     依存関係(idna/werkzeug等)がインストールされていない環境でdesign-diffを

@@ -154,8 +154,11 @@ GitHub上で生の`<svg>`タグと`<img src="data:...">`の両方が実機検証
 - **コメントはupsertする**: 同一PRで何度pushしても新規コメントは積み上がらず、
   隠しマーカー(`<!-- design-diff:auto-comment -->`)で見つけた既存コメントを更新する。
   通知の洪水を避けるため
-- **沈黙原則**: `has_changes` が false(クラス構造に変化なし)のときはコメント自体を
-  投稿しない
+- **沈黙原則**: `has_changes` が false(クラス構造に変化なし)**かつ** `warnings`
+  が空(解析はパッケージ全体を網羅できた)のときだけ、コメント自体を投稿しない。
+  サブモジュールのimport失敗等で解析が部分的だった場合(`warnings`が非空)は、
+  クラス差分が皆無でも「変更なしに見えるが解析は部分的だった」ことを伝えるため
+  コメントを投稿する
 - **セキュリティ**: `pull_request_target` は使わない。フォークからのPRは
   ジョブ自体をスキップする(`if: github.event.pull_request.head.repo.full_name ==
   github.repository`)ため、信頼できないコードに対してpy2pumlのimportベース解析を
@@ -173,7 +176,9 @@ GitHub上で生の`<svg>`タグと`<img src="data:...">`の両方が実機検証
 
 `--format json` は自己完結したJSONを出力する。`mermaid`フィールドに描画済みの
 Mermaidブロックも同梱されるため、JSON単体でも人間可読な図をAIレビュアーが
-再現できる。スキーマは [docs/design/architecture.md](./docs/design/architecture.md) §6 を参照。
+再現できる。`warnings`配列(サブモジュールのimport失敗で解析できなかった
+モジュール名の一覧。空なら解析はパッケージ全体を網羅している)も含む
+(`schema_version: "1.1"`)。スキーマは [docs/design/architecture.md](./docs/design/architecture.md) §6 を参照。
 
 ## 制約・セキュリティ(Limitations & Security)
 
@@ -202,13 +207,15 @@ Mermaidブロックも同梱されるため、JSON単体でも人間可読な図
   不要になった依存を、古いバージョンのコードはまだ必要としている)。1つの環境に
   依存関係をインストールしただけでは両方のバージョンを解析するのに不十分な場合が
   ある(最小再現コードで確認済み)。近いバージョン同士の比較では通常問題にならない
-- **Limitations(未修正・既知の問題)**: **サブモジュールのimport失敗は無言で
-  スキップされ、該当クラスが警告なしに解析結果から消える**(トップレベルの
-  `__init__.py`自体の失敗は従来通りエラーとして表面化する)。1モジュールの
-  失敗で他のモジュールの解析まで止めないための意図した耐障害性の副作用だが、
-  レビュアーが「変更なし」と誤認するリスクがある。原理的には修正可能と考えて
-  おり、対応を検討中([docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
-  参照)
+- **サブモジュールのimport失敗は警告として可視化される**: パッケージ内の
+  1サブモジュールがimportに失敗しても、design-diffは解析全体を止めず、他の
+  モジュールの解析を続ける(耐障害性)。ただし失敗したモジュール名は
+  JSON出力の`warnings`配列とMermaid出力の`⚠ 解析できなかったモジュール: N件`
+  noteの両方に記録され、無言では消えない(かつては警告なしにクラスが消えて
+  いたが修正済み。トップレベルの`__init__.py`自体の失敗は従来通り
+  `Py2pumlExtractionError`として即座に表面化する)。詳細は
+  [docs/design/investigations/real-world-package-testing.md](./docs/design/investigations/real-world-package-testing.md)
+  参照
 - **実戦テスト済み**: 実在のPythonパッケージ10種類以上(requests/flask/click/
   rich/httpx/fastapi/typer/aiohttp/paramiko/numpy、科学計算・Web・CLI・非同期・
   システム系と性質を変えて検証)に対して、各パッケージ自身の依存を正しく

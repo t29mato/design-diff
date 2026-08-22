@@ -101,3 +101,16 @@ class TestSnapshotIR:
         )
         assert snapshot.classes["pkg.Car"] is car
         assert relation in snapshot.relations
+
+    def test_skipped_modules_defaults_to_empty_tuple(self):
+        snapshot = SnapshotIR(package="pkg", classes={}, relations=frozenset())
+        assert snapshot.skipped_modules == ()
+
+    def test_skipped_modules_can_record_import_failures(self):
+        snapshot = SnapshotIR(
+            package="pkg",
+            classes={},
+            relations=frozenset(),
+            skipped_modules=("pkg.broken",),
+        )
+        assert snapshot.skipped_modules == ("pkg.broken",)

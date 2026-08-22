@@ -145,6 +145,33 @@ class TestComputeDesignDiffUseCase:
         assert [c.fqn for c in result.diff.classes.added] == ["pkg.Battery"]
         assert result.diff.has_changes is True
 
+    def test_propagates_skipped_modules_from_extractor_into_diff_warnings(self):
+        """発見した問題(サブモジュールのimport失敗が無言でスキップされる)への対応。
+        extractorがSnapshotIR.skipped_modulesに記録した内容が、実際のDiffEngineを
+        通ってresult.diff.warningsまで届くこと。
+        """
+        vcs = FakeVcs()
+        head_snapshot = SnapshotIR(
+            package="pkg", classes={}, relations=frozenset(), skipped_modules=("pkg.broken",)
+        )
+        extractor = FakeExtractor(
+            {
+                "/fake/worktree/main": empty_snapshot("pkg"),
+                "/fake/worktree/feature": head_snapshot,
+            }
+        )
+        use_case = ComputeDesignDiffUseCase(
+            vcs=vcs,
+            extractor=extractor,
+            mermaid_renderer=FakeRenderer("mermaid"),
+            json_renderer=FakeRenderer("json"),
+        )
+
+        result = use_case.execute(base_ref="main", head_ref="feature", package="pkg")
+
+        assert result.diff.warnings == ("pkg.broken",)
+        assert result.diff.has_changes is False
+
     def test_renders_mermaid_and_json_from_the_computed_diff(self):
         vcs = FakeVcs()
         extractor = FakeExtractor(

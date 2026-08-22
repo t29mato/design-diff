@@ -1,7 +1,7 @@
 """GitHub Actionエントリポイント。architecture.md §2, §2.1, §8, §9。
 
 PRイベントでbase...headの設計diffを計算し、Mermaidブロックをコメントとして
-upsertする(沈黙原則: has_changesがfalseなら投稿しない。実体は
+upsertする(沈黙原則: has_changesがfalseかつwarningsが空なら投稿しない。実体は
 application.use_cases.PostDesignDiffCommentUseCase)。
 引数解析とアダプタの注入だけを行う薄い殻(cli/main.pyと同じ方針。HQ指摘2)。
 

@@ -2,6 +2,10 @@
 
 AIレビュアーがそのまま読める自己完結JSONを出力する。schema_versionはフィールド追加時
 のみ変更し、破壊的変更ではmajorを上げる(§6)。
+
+`warnings`(1.0→1.1、後方互換な追加): サブモジュールのimport失敗で解析が部分的に
+しかできなかった場合、スキップしたモジュール名の一覧をここに載せる。空配列なら
+解析はパッケージ全体を網羅している。
 """
 
 from __future__ import annotations
@@ -11,7 +15,7 @@ import json
 from design_diff.domain.diff import AttributeDiff, MethodDiff, SnapshotDiff
 from design_diff.domain.model import AttributeIR, ClassIR, MethodIR, ParameterIR, RelationIR
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 
 def _attribute_to_dict(attribute: AttributeIR) -> dict:
@@ -78,6 +82,7 @@ class JsonRenderer:
             "base_ref": meta.get("base_ref", ""),
             "head_ref": meta.get("head_ref", ""),
             "has_changes": diff.has_changes,
+            "warnings": list(diff.warnings),
             "summary": {
                 "classes_added": len(diff.classes.added),
                 "classes_removed": len(diff.classes.removed),

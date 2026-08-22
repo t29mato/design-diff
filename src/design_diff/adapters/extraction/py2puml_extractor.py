@@ -114,4 +114,9 @@ class Py2pumlExtractor:
             for r in payload["relations"]
         )
 
-        return SnapshotIR(package=payload["package"], classes=classes, relations=relations)
+        return SnapshotIR(
+            package=payload["package"],
+            classes=classes,
+            relations=relations,
+            skipped_modules=tuple(payload.get("skipped_modules", ())),
+        )

@@ -506,6 +506,49 @@ class TestMermaidRendererRelations:
         assert "removed" in removed_line
 
 
+class TestMermaidRendererWarnings:
+    """発見した問題(サブモジュールのimport失敗が無言でスキップされる)への対応。
+    HQ指摘: 沈黙原則が『沈黙=変更なし』に依存している以上、部分解析だった事実
+    (SnapshotDiff.warnings)は図の中にも見える形で出す必要がある。
+    """
+
+    def test_no_warnings_note_when_warnings_is_empty(self):
+        output = MermaidRenderer().render(EMPTY_DIFF)
+        assert "解析できなかった" not in output
+
+    def test_warnings_note_lists_skipped_module_count_and_names(self):
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",))
+
+        output = MermaidRenderer().render(diff)
+
+        assert 'note "' in output
+        assert "解析できなかったモジュール" in output
+        assert "1件" in output
+        assert "pkg.broken" in output
+
+    def test_warnings_note_lists_every_skipped_module(self):
+        diff = SnapshotDiff(
+            classes=ClassDiff(),
+            relations=RelationDiff(),
+            warnings=("pkg.a_broken", "pkg.b_broken"),
+        )
+
+        output = MermaidRenderer().render(diff)
+
+        assert "2件" in output
+        assert "pkg.a_broken" in output
+        assert "pkg.b_broken" in output
+
+    def test_warnings_note_appears_even_when_there_are_no_class_changes(self):
+        """『変更なしに見えるが解析は部分的』の場合でも、有効なMermaidが出ること。"""
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",))
+
+        output = MermaidRenderer().render(diff)
+
+        assert output.startswith("classDiagram")
+        assert "pkg.broken" in output
+
+
 class TestMermaidRendererSizeCap:
     """追加要件: 図のサイズ制御。変更クラス数が上限を超えたら上位N件のみ図示。"""
 

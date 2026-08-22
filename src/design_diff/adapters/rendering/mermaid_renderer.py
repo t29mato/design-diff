@@ -53,6 +53,11 @@
   (標準Mermaid構文)で要約する。Markdown表などは混ぜない
   ―― GitHubのPRコメントプレビューだけでなく、mermaid-cli等によるSVG変換にも
   そのまま渡せる、純粋なMermaidテキストであり続けるようにするため
+- **`diff.warnings`(サブモジュールのimport失敗)は、他のどのnoteより先に
+  `⚠ 解析できなかったモジュール: N件`というnoteで示す**。沈黙原則(§4.1)は
+  『沈黙=変更なし』が真であることに依存しており、部分解析だった事実が無言のままだと
+  この前提が崩れる(実戦テストで発見。real-world-package-testing.md)。クラス差分が
+  皆無でもこのnoteだけは出す(=沈黙するのは『変更なし かつ 警告なし』の場合のみ)
 """
 
 from __future__ import annotations
@@ -278,7 +283,10 @@ class MermaidRenderer:
         lines.extend(self._render_namespaced_declarations(declarations))
         lines.extend(self._render_style_lines(declarations))
 
-        notes = self._collect_notes(selected)
+        notes = []
+        if diff.warnings:
+            notes.append(self._warnings_note(diff.warnings))
+        notes.extend(self._collect_notes(selected))
         if capped:
             notes.append(self._summary_note(total, len(selected)))
         lines.extend(notes)
@@ -307,6 +315,18 @@ class MermaidRenderer:
             f"{total} classes changed - showing top {shown} by impact.\\n"
             "See the JSON output for the complete list."
         )
+        return f'    note "{text}"'
+
+    def _warnings_note(self, warnings: tuple[str, ...]) -> str:
+        """発見した問題(サブモジュールのimport失敗が無言でスキップされる)への対応。
+
+        沈黙原則(§4.1)は『沈黙=変更なし』が真であることに依存している。解析が
+        部分的(warningsが非空)な場合、たとえクラス差分が無くても、レビュアーには
+        「これは完全な解析結果ではない」ことが図の中からも伝わる必要がある。
+        """
+        lines = [f"⚠ 解析できなかったモジュール: {len(warnings)}件"]
+        lines.extend(f"- {name}" for name in warnings)
+        text = "\\n".join(lines)
         return f'    note "{text}"'
 
     # -- クラス宣言 -------------------------------------------------------

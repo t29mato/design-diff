@@ -397,10 +397,18 @@ def _unresolved_type_names(attributes: list[dict], resolved_names: set[str]) -> 
 # ---------------------------------------------------------------------------
 
 
-def _iter_target_classes(package_path: Path, package: str) -> typing.Iterator[type]:
+def _iter_target_classes(
+    package_path: Path, package: str, skipped_modules: list[str] | None = None
+) -> typing.Iterator[type]:
     """py2pumlのInspectorと同じ手法(pkgutil.walk_packages +
     py2puml.inspection.inspectmodule.filter_domain_definitions)で、対象パッケージに
     属するクラスを列挙する。属性/関係の抽出(クラッシュしうる部分)はここでは行わない。
+
+    サブモジュールのimportに失敗した場合、そのモジュールのクラスは列挙できないが
+    (=解析は部分的にしかできない)、全体の解析は止めない。以前はこの失敗を完全に
+    無言で握りつぶしており、『沈黙=変更なし』という沈黙原則の前提を壊す形で
+    クラスが警告なしに消えていた(実戦テストで発見。real-world-package-testing.md)。
+    `skipped_modules`が渡された場合、失敗したモジュール名をここに追記する。
     """
     seen_fqns: set[str] = set()
 
@@ -431,6 +439,8 @@ def _iter_target_classes(package_path: Path, package: str) -> typing.Iterator[ty
             try:
                 module = importlib.import_module(module_name)
             except Exception:  # noqa: BLE001 - 1モジュールのimport失敗で全体を止めない
+                if skipped_modules is not None:
+                    skipped_modules.append(module_name)
                 continue
             yield from _yield_new(module)
     else:
@@ -457,8 +467,9 @@ def extract_snapshot(root: Path, package: str, *, include_dunder: bool = False) 
         sys.path.insert(0, str(resolved_root / "src"))
     sys.path.insert(0, str(resolved_root))
 
+    skipped_modules: list[str] = []
     class_objects_by_fqn: dict[str, type] = {}
-    for cls in _iter_target_classes(package_path, package):
+    for cls in _iter_target_classes(package_path, package, skipped_modules):
         fqn = f"{cls.__module__}.{cls.__qualname__}"
         class_objects_by_fqn[fqn] = cls
 
@@ -517,7 +528,12 @@ def extract_snapshot(root: Path, package: str, *, include_dunder: bool = False) 
             if len(matches) == 1 and matches[0] != fqn:
                 _add_relation(fqn, matches[0], "composition")
 
-    return {"package": package, "classes": classes, "relations": relations}
+    return {
+        "package": package,
+        "classes": classes,
+        "relations": relations,
+        "skipped_modules": sorted(set(skipped_modules)),
+    }
 
 
 def _own_resolved_attribute_values(cls: type) -> list[object]:

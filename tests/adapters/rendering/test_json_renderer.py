@@ -25,7 +25,7 @@ META = {"package": "pkg", "base_ref": "main", "head_ref": "feature"}
 class TestJsonRendererTopLevelFields:
     def test_includes_schema_version_and_tool(self):
         payload = json.loads(JsonRenderer().render(EMPTY_DIFF, meta=META))
-        assert payload["schema_version"] == "1.0"
+        assert payload["schema_version"] == "1.1"
         assert payload["tool"] == "design-diff"
 
     def test_includes_package_and_refs_from_meta(self):
@@ -52,6 +52,15 @@ class TestJsonRendererTopLevelFields:
         assert payload["package"] == ""
         assert payload["base_ref"] == ""
         assert payload["head_ref"] == ""
+
+    def test_warnings_is_empty_array_when_no_modules_were_skipped(self):
+        payload = json.loads(JsonRenderer().render(EMPTY_DIFF, meta=META))
+        assert payload["warnings"] == []
+
+    def test_warnings_lists_skipped_module_names(self):
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",))
+        payload = json.loads(JsonRenderer().render(diff, meta=META))
+        assert payload["warnings"] == ["pkg.broken"]
 
 
 class TestJsonRendererSummary:

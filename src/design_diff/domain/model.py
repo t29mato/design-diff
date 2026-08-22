@@ -58,3 +58,7 @@ class SnapshotIR:
     package: str
     classes: dict[str, ClassIR]
     relations: frozenset[RelationIR]
+    # このスナップショットの抽出中にimportに失敗し、解析対象から除外された
+    # サブモジュールのモジュール名。空でない場合、classes/relationsは対象
+    # パッケージ全体を網羅していない可能性がある(部分解析)。
+    skipped_modules: tuple[str, ...] = ()

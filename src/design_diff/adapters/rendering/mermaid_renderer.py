@@ -53,6 +53,11 @@
   (標準Mermaid構文)で要約する。Markdown表などは混ぜない
   ―― GitHubのPRコメントプレビューだけでなく、mermaid-cli等によるSVG変換にも
   そのまま渡せる、純粋なMermaidテキストであり続けるようにするため
+- **追加/削除されたリレーションの線には、Mermaidの矢印ラベル記法
+  (`ClassA <|-- ClassB : label`)で`new`/`removed`ラベルを付ける**。以前は
+  ソースコード上のコメント(`%% removed`)にしていたが、これはMermaid
+  レンダラーが描画する図には一切表示されない。デモ図との品質比較(HQ #36)で
+  唯一デモに劣っていた点として指摘され、実際に図の中に見えるラベルに変更した
 - **`diff.warnings`(サブモジュールのimport失敗)は、他のどのnoteより先に
   `⚠ 解析できなかったモジュール: N件`というnoteで示す**。沈黙原則(§4.1)は
   『沈黙=変更なし』が真であることに依存しており、部分解析だった事実が無言のままだと
@@ -391,7 +396,12 @@ class MermaidRenderer:
 
     def _render_relation_line(self, relation: RelationIR, *, removed: bool) -> str:
         arrow = _RELATION_ARROW[relation.type]
-        line = f"    {_mermaid_id(relation.source_fqn)} {arrow} {_mermaid_id(relation.target_fqn)}"
-        if removed:
-            line += "  %% removed"
-        return line
+        # Mermaidの矢印ラベル記法(`ClassA <|-- ClassB : label`)で追加/削除を示す。
+        # 以前はコメント(`%% removed`)だったが、これはMermaidレンダラーには
+        # 表示されない(ソース上でのみ読める注釈)。デモ図との品質比較(HQ #36)で
+        # 唯一劣っていた点として指摘され、実際に図の中に見えるラベルに変更した。
+        label = "new" if not removed else "removed"
+        return (
+            f"    {_mermaid_id(relation.source_fqn)} {arrow} "
+            f"{_mermaid_id(relation.target_fqn)} : {label}"
+        )

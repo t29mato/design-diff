@@ -505,6 +505,46 @@ class TestMermaidRendererRelations:
         assert added_line != removed_line
         assert "removed" in removed_line
 
+    def test_added_relation_gets_a_new_label(self):
+        """HQ指摘(デモ図との品質比較): 追加されたリレーションにMermaidの矢印
+        ラベル記法(`A --> B : label`)で"new"ラベルを付ける。
+        """
+        relation = RelationIR(
+            source_fqn="pkg.models.Car",
+            target_fqn="pkg.models.Battery",
+            type=RelationType.COMPOSITION,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
+
+        output = MermaidRenderer().render(diff)
+
+        assert "pkg_models_Car *-- pkg_models_Battery : new" in output
+
+    def test_removed_relation_gets_a_removed_label(self):
+        """HQ指摘: 削除されたリレーションには同じ記法で"removed"ラベルを付ける。"""
+        relation = RelationIR(
+            source_fqn="pkg.models.Car",
+            target_fqn="pkg.models.Wheel",
+            type=RelationType.COMPOSITION,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(removed=(relation,)))
+
+        output = MermaidRenderer().render(diff)
+
+        assert "pkg_models_Car *-- pkg_models_Wheel : removed" in output
+
+    def test_inheritance_relation_also_gets_a_label(self):
+        relation = RelationIR(
+            source_fqn="pkg.models.Vehicle",
+            target_fqn="pkg.models.Car",
+            type=RelationType.INHERITANCE,
+        )
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(added=(relation,)))
+
+        output = MermaidRenderer().render(diff)
+
+        assert "pkg_models_Vehicle <|-- pkg_models_Car : new" in output
+
 
 class TestMermaidRendererWarnings:
     """発見した問題(サブモジュールのimport失敗が無言でスキップされる)への対応。

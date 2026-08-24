@@ -29,6 +29,40 @@
 - JSON出力・noteの差分表記(`+`/`-`/`~`のプレーンテキスト)は変更していない。
   絵文字非対応環境向けのフォールバックとして引き続き機能する
 
+上記の絵文字マーカー対応についても、オーナーからHQ #36/#38で再度差し戻しが
+あった: 「絵文字を使うのではなく、GitHub diffみたいに視覚的にわかる形に。
+Mermaidやplantumlで限界があるなら他の方法を考えて」。Mermaid classDiagramは
+メンバー単位のスタイリングを一切サポートしないため(公式ドキュメント・GitHub
+issueで確認済み)、**design-diff自身が直接SVGを生成するネイティブレンダラー
+を新規実装した**(段階的実装。今回はレンダラー本体+README差し替えまで)。
+
+### Added
+
+- **`GitHubStyleSvgRenderer`を新規実装**(`adapters/rendering/
+  github_style_svg_renderer.py`)。SnapshotDiffからmermaid非依存の自己完結SVGを
+  直接生成する。ビジュアル仕様(GitHub diff風の配色・レイアウト)はHQが指定:
+  クラスボックスのヘッダー色で状態を示し(追加=緑/削除=赤+取り消し線/変更=
+  黄枠)、メンバー行はGitHubのコードdiffの行そのもの(左ガター+行全体の背景色。
+  変更行は「旧シグネチャ → 新シグネチャ」を1行表示)、リレーションは矢印+
+  `new`/`removed`ラベル。レイアウトは名前空間ごとの単純なグリッド配置
+- `--format svg`の既定をこのネイティブレンダラーに切り替えた。旧来の
+  mermaid-cli経由の変換は`--format svg-mermaid`として存置(メンバー単位の
+  色分けは無い)
+- README冒頭の出力例を、このSVG(`docs/images/shop-discount-codes.svg`)に
+  差し替えた
+
+### Known Limitations(追加)
+
+- ネイティブSVG(`--format svg`)には、Mermaid形式が持つ「変更クラス数が多い
+  場合の上位N件表示+省略件数の要約」というサイズ制御がまだ無い。件数が非常に
+  多いPRでは図が縦に長くなり続ける
+
+### 未完了(次のフェーズ)
+
+- GitHub PRコメントへのSVG埋め込み(生成したSVGを専用ブランチにコミットし、
+  raw URL経由で`<img>`参照する方式。従来のMermaidブロックは`<details>`内の
+  フォールバックとして残す)。実装中
+
 ## [0.2.1] - 2026-08-22
 
 **目玉**: サブモジュールのimport失敗が無言でスキップされ、クラスが警告なしに

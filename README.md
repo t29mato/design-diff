@@ -11,50 +11,34 @@
 
 AIがコードを書く時代、人間のレビューは行diffから設計diffへ上がる。「500行変わった」
 ではなく「このクラスが増え、この依存が生えた」を**1枚の絵**で見せるのが design-diff
-の価値。文字ベースのdiffではなく、**Mermaidのクラス図としてプレビューできること**が
-このツールの中心的な価値であり、それ以外の全ての設計判断はこの1点に従属する。
+の価値。文字ベースのdiffではなく、**GitHubのコードdiffのように、増えた/減った/変わった
+メンバーが色と取り消し線で一目で分かる図としてプレビューできること**がこのツールの
+中心的な価値であり、それ以外の全ての設計判断はこの1点に従属する。
 
 出力例(実際にCLIを実行した結果、手を加えていない): [docs/examples/](./docs/examples/)
 
 ### 出力例(抜粋)
 
-`design-diff diff main feature/discount-codes --package shop --format mermaid` の
+`design-diff diff main feature/discount-codes --package shop --format svg` の
 実際の出力(手を加えていない。完全版は
 [docs/examples/shop-discount-codes.md](./docs/examples/shop-discount-codes.md)):
 
-```mermaid
-classDiagram
-    namespace shop.models {
-        class shop_models_Cart["[~] Cart"] {
-            +items: List[Product]
-            ➕ +discount_code: Optional[DiscountCode]
-            ➖ +̶l̶e̶g̶a̶c̶y̶_̶n̶o̶t̶e̶s̶:̶ ̶s̶t̶r̶
-            +add(product: Product): None
-            ➕ +apply_code(code: DiscountCode): None
-            +total(): float
-            ➖ +̶s̶e̶n̶d̶_̶l̶e̶g̶a̶c̶y̶_̶r̶e̶c̶e̶i̶p̶t̶(̶)̶:̶ ̶N̶o̶n̶e̶
-        }
-        class shop_models_DiscountCode["[+] DiscountCode"] {
-            +code: str
-            +percent_off: float
-        }
-        class shop_models_LegacyCouponBanner["[-] LegacyCouponBanner"] {
-            +text: str
-        }
-    }
-    style shop_models_Cart fill:#fff8e6,stroke:#b08800,stroke-width:2px,color:#b08800
-    style shop_models_DiscountCode fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
-    style shop_models_LegacyCouponBanner fill:#ffeef0,stroke:#b31d28,stroke-width:2px,color:#b31d28
-    shop_models_Cart *-- shop_models_DiscountCode : new
-```
+<img src="./docs/images/shop-discount-codes.svg" alt="shopパッケージへのdiscount-codes機能追加をdesign-diffで解析したGitHub diff風のクラス図。DiscountCodeクラスの追加(緑ヘッダー)、LegacyCouponBannerクラスの削除(赤ヘッダー+取り消し線)、Cartクラスの変更(黄枠。discount_codeプロパティとapply_code()メソッドの追加行が緑背景、legacy_notesプロパティとsend_legacy_receipt()メソッドの削除行が赤背景+取り消し線)、Productクラスのapply_discount()メソッドのシグネチャ変更(黄背景でold→newを1行表示)が、GitHubのコードdiffと同じ配色で1枚の図に収まっている。">
 
-`DiscountCode`クラスの追加(緑)、`LegacyCouponBanner`クラスの削除(赤)、`Cart`の
-変更(黄)が、1枚の図に収まっている。`Cart`は追加プロパティ・追加メソッド・
-削除プロパティ・削除メソッドの4種類全てを含む例になっている:
-`discount_code`/`apply_code()`が新しく増えたメンバーは行頭の➕で、
-`legacy_notes`/`send_legacy_receipt()`のように無くなったメンバーは行頭の➖と
-取り消し線の両方で分かる。`Cart *-- DiscountCode`という新しいコンポジション
-依存にも矢印ラベルで`: new`が付く。
+`DiscountCode`クラスの追加(緑ヘッダー)、`LegacyCouponBanner`クラスの削除
+(赤ヘッダー+クラス名取り消し線)、`Cart`/`Product`の変更(黄枠)が、GitHubの
+コードdiffと同じ配色で1枚の図に収まっている。`Cart`は追加プロパティ・追加
+メソッド・削除プロパティ・削除メソッドの4種類全てを含む例になっている:
+`discount_code`/`apply_code()`が新しく増えた行は緑背景の`+`ガター、
+`legacy_notes`/`send_legacy_receipt()`のように無くなった行は赤背景の`-`ガター
++取り消し線、`Product.apply_discount()`のようなシグネチャ変更は黄背景の`±`
+ガターで「旧のシグネチャ → 新のシグネチャ」を1行表示する。`Cart *-- DiscountCode`
+という新しいコンポジション依存にも緑の実線+`new`ラベルが付く。
+
+このSVGはmermaid非依存の自己完結ファイル(design-diff自身が直接生成。
+`--format svg`)。Mermaidの`classDiagram`はメンバー単位のスタイリングを
+一切サポートしないため(下記「表示に関する注記」参照)、GitHub diff風の
+表現力が必要な場合はこちらを使う。
 
 ## 使い方
 
@@ -73,34 +57,57 @@ design-diff diff main feature/my-branch --package myapp --format mermaid
   **追加の設定なしにPR上で絵として見える**。README上のMermaidブロックも同様に
   GitHub上でプレビューされる(このREADME自体、[docs/examples/](./docs/examples/)の
   ブロックがその実例)
-- **ローカルCLI利用時**: ターミナルにMermaidのテキストが出るだけではプレビューできない。
-  次の3つの方法がある:
-  1. `--format svg` でSVGを直接出力する(下記参照。要 [mermaid-cli](https://github.com/mermaid-js/mermaid-cli))
-  2. 出力を `.mmd` ファイルに保存し、エディタのMermaid拡張(VS Codeの
+- **ローカルCLI利用時**: `--format svg`(既定・後述)でGitHub diff風のSVGファイルを
+  直接出力できる。ターミナルにMermaidのテキストが出るだけでは味気ない場合、
+  `--format mermaid`の出力を次のいずれかでプレビューすることもできる:
+  1. 出力を `.mmd` ファイルに保存し、エディタのMermaid拡張(VS Codeの
      "Markdown Preview Mermaid Support" 等)で開く
-  3. [mermaid.live](https://mermaid.live) にテキストを貼り付ける(インストール不要)
+  2. [mermaid.live](https://mermaid.live) にテキストを貼り付ける(インストール不要)
+  3. `--format svg-mermaid`(要 [mermaid-cli](https://github.com/mermaid-js/mermaid-cli)。旧実装、下記参照)
 
-### ローカルSVG出力(`--format svg`)
+### ローカルSVG出力(`--format svg`、既定でネイティブレンダラー)
 
 ```bash
 design-diff diff main feature/my-branch --package myapp --format svg > diagram.svg
 ```
 
-design-diff自身はNode.js/Puppeteerのような重い依存を持たない。既に
-[mermaid-cli](https://github.com/mermaid-js/mermaid-cli)(`mmdc`)がローカルに
-インストールされていればそれを使ってSVGに変換する。無い場合はエラーと共に
-インストール手順(または mermaid.live での代替方法)を案内するだけで、
-design-diffが勝手にNode.jsパッケージを自動ダウンロードすることはない。
+**mermaid非依存の自己完結SVGをdesign-diff自身が直接生成する**(外部フォント・
+外部画像参照なし、`mermaid-cli`等の外部ツールも不要)。GitHubのコードdiffと
+同じ配色・レイアウト(下記「出力の読み方」参照)で、増えた/減った/変わった
+メンバーを1行ずつ色分けする。README冒頭の出力例がこの形式の実例
+(`docs/images/shop-discount-codes.svg`)。
+
+旧実装(mermaid-cli経由でMermaidテキストをSVGに変換するだけのもの。メンバー単位の
+色分けは無い)は`--format svg-mermaid`として残している:
 
 ```bash
-npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
+design-diff diff main feature/my-branch --package myapp --format svg-mermaid > diagram.svg
+npm install -g @mermaid-js/mermaid-cli   # svg-mermaidを使うなら一度だけ
 ```
+
+design-diff自身はNode.js/Puppeteerのような重い依存を持たない。`svg-mermaid`は
+既に`mmdc`がローカルにインストールされていればそれを使うだけで、design-diffが
+勝手にNode.jsパッケージを自動ダウンロードすることはない。
 
 > **調査メモ**: Node.js/Puppeteer(Chromium)を要求しないSVG化経路(`mermaidx`という
 > Python製パッケージ)の存在を実機検証済み。乗り換えの投資判断はまだしていない。
 > 詳細は [docs/design/investigations/mermaid-svg-without-chromium.md](./docs/design/investigations/mermaid-svg-without-chromium.md)。
+> (ネイティブSVGレンダラーの実装により、この投資判断の重要性は下がった)
 
 ## 出力の読み方
+
+### `--format svg`(ネイティブSVG、既定): GitHub diff風
+
+- クラスボックスのヘッダー色で状態を示す: 追加=緑ヘッダー、削除=赤ヘッダー+
+  クラス名取り消し線、変更=ヘッダー中立+黄枠
+- **メンバー行はGitHubのコードdiffの行そのもの**: 追加行=緑背景+左ガター`+`、
+  削除行=赤背景+左ガター`-`+テキスト取り消し線、変更行=黄背景+左ガター`±`で
+  「旧のシグネチャ → 新のシグネチャ」を1行表示、無変更行はガター空白・背景なし
+- リレーションは実線+三角(継承)/菱形(コンポジション)。追加された線は緑+
+  `new`ラベル、削除された線は赤破線+`removed`ラベル
+- 名前空間はグループ枠+左上のラベルで示す
+
+### `--format mermaid`/`svg-mermaid`: Mermaid classDiagram
 
 - `[+]` = 追加されたクラス、`[-]` = 削除されたクラス、`[~]` = 変更されたクラス。
   ラベルのASCIIタグに加えて、`style`文で実際に色も付く(追加=緑/削除=赤/変更=黄、
@@ -110,15 +117,20 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
   `(was: <旧の型>)`も付く)。削除された属性/メソッドはheadにはもう存在しないが、
   クラス本体の中に➖付き・取り消し線付きで表示される(クラス単位の`note`要約とは
   別に、本体を見るだけで「このクラスの何が変わったか」まで分かるようにするため)
+
+### 両形式に共通
+
 - 可視性マーカー `+`(public) / `-`(private) で、アンダースコア始まりのメンバーを
   区別する。クラスの公開APIが一目で分かる
 - 変更のないクラスは図に出さない(ノイズ削減)
-- 変更されたクラス数が既定20を超える大きなPRでは、影響度(差分の大きさ)順に
-  上位20件だけを図示し、省略件数を`note`で明示する。完全な一覧は`--format json`で
+- Mermaid形式は、変更されたクラス数が既定20を超える大きなPRでは、影響度(差分の
+  大きさ)順に上位20件だけを図示し、省略件数を`note`で明示する。完全な一覧は
+  `--format json`で(ネイティブSVGは現時点でこのサイズ制御を持たない。既知の
+  制約として下記Limitationsに記載)
 - `--include-dunder` を付けない限り、`__init__`等のダンダーメソッドは表示しない
   (dataclass自動生成やProtocolのボイラープレートで図がノイズだらけになるのを防ぐため)
 
-### 表示に関する注記: 色分けの実現方法
+### 表示に関する注記: なぜネイティブSVGレンダラーを実装したか
 
 当初はMermaidの`classDef`+`cssClass`による色分け(追加=緑/削除=赤/変更=黄)を
 実装していたが、GitHubのPRコメントおよびmermaid.live双方で実機検証したところ、
@@ -126,35 +138,24 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
 design-diff固有の不具合ではなく、Mermaid本体側の既知の問題
 ([mermaid-js/mermaid#1649](https://github.com/mermaid-js/mermaid/issues/1649))。
 
-その後、ノード単体を対象にする**`style <id> fill:...,stroke:...;`文**(`classDef`/
-`cssClass`とは別のMermaid機構)を検証したところ、GitHubの実機(namespace記法・
-ラベル・メソッド本文と併用した状態)で緑/赤/黄が実際に描画されることを確認できた
-([docs/design/architecture.md](./docs/design/architecture.md) §7参照)。これは
-GitHub固有の裏技ではなく標準Mermaid構文なので、GitLab等の他のMermaid実装でも
-動作する見込みだが、GitHub以外での実機確認はまだ行っていない。
+その後、ノード単体を対象にする`style <id> fill:...,stroke:...;`文でクラス単位の
+色分けは実現できたが、**`style`文はノード(クラス)単位にしか色を当てられず、
+メンバー(property/method)1つ1つには適用できない**。これはMermaid公式ドキュメント
+([mermaid.js.org/syntax/classDiagram.html](https://mermaid.js.org/syntax/classDiagram.html))
+のスタイリング節、および関連GitHub issue([#2408](https://github.com/mermaid-js/mermaid/issues/2408)、
+[#1679](https://github.com/mermaid-js/mermaid/issues/1679)、
+[#1181](https://github.com/mermaid-js/mermaid/issues/1181))で確認済みの、Mermaid
+本体の構造的な制約(詳細は[docs/design/architecture.md](./docs/design/architecture.md) §7参照)。
 
-`fill`/`stroke`だけを指定した最初の実装では、背景色・枠線は変わるのに
-タイトル・メンバーの文字自体はテーマ既定の薄いグレーのまま残ってしまい、
-色分けの効果が薄いという指摘を受けた。`style`文に**`color`(文字色)も指定**する
-ことで、GitHub実機でタイトル・メンバー行とも状態色で塗られることを確認済み。
-
-**ただし`style`文はノード(クラス)単位にしか色を当てられず、メンバー(property/
-method)1つ1つには適用できない**(Mermaid公式ドキュメント・GitHub issueで確認済み。
-[docs/design/architecture.md](./docs/design/architecture.md) §7参照)。カスタムSVGで
-メンバー単位の色分けを実現する案も検討したが、GitHub上で生の`<svg>`タグと
-`<img src="data:...">`の両方が実機検証でサニタイズ(除去)されることを確認しており、
-GitHub PRコメントへ直接埋め込む手段としては使えない(README/ローカルファイルとして
-なら`--format svg`で問題なく使える)。
-
-そのため「このクラスの、どのproperty/methodそのものが増えた/減ったか」は、色では
-なく**メンバー行の先頭に付ける絵文字マーカー**(➕追加/➖削除/🔀変更)で表現している。
-削除された行にはさらにUnicode取り消し線合成(U+0336)でテキスト自体にも取り消し線を
-引く(git diffの取り消し線表現に近い視覚効果)。当初はASCIIサフィックスタグ
-(`[+]`/`[-]`/`[~]`)を採用していたが、実際のデモ図との品質比較で「視覚的な顕著性が
-足りない」という指摘を受け、行頭の絵文字マーカーに変更した。絵文字・取り消し線とも
-GitHub実機で崩れずに描画されることを確認済み。JSON出力やnote内の差分表記(`+`/`-`/`~`)
-とは記法が異なるが、noteのプレーンテキスト表記は絵文字非対応ビューア向けの
-フォールバックとして引き続き機能する。
+この制約の中でメンバー単位の増減を示すため、行末のASCIIタグ→行頭の絵文字マーカー
+と段階的に改善を試みたが、いずれもオーナーから「GitHubのコードdiffのように視覚的に
+一目で分かる形にしてほしい」という差し戻しを受けた。**Mermaidという土俵の中での
+改善には限界がある**という結論に至り、design-diff自身が直接SVGを生成する
+`GitHubStyleSvgRenderer`(`--format svg`)を実装した。GitHub上で生の`<svg>`タグ・
+`<img src="data:...">`の直接埋め込みはサニタイザーに除去されることを実機検証済み
+のため、PRコメントへの埋め込みは別の仕組み(生成したSVGをリポジトリにコミットし、
+raw URL経由で`<img>`参照する)で対応する予定(実装中。完了後にここを更新する)。
+ローカルファイル/README上ならこのSVGはそのまま使える。
 
 ## GitHub Action(PRコメント自動投稿)
 
@@ -217,6 +218,11 @@ Mermaidブロックも同梱されるため、JSON単体でも人間可読な図
   不要になった依存を、古いバージョンのコードはまだ必要としている)。1つの環境に
   依存関係をインストールしただけでは両方のバージョンを解析するのに不十分な場合が
   ある(最小再現コードで確認済み)。近いバージョン同士の比較では通常問題にならない
+- **Limitations**: **ネイティブSVG(`--format svg`)には、現時点でMermaid形式が
+  持つ「変更クラス数が多い場合の上位N件表示+省略件数の要約」というサイズ制御が
+  無い**。変更クラス数が非常に多いPRでは、SVGが縦に長くなり続ける(グリッド
+  レイアウトが横に広がりすぎないようにはしているが、件数上限は無い)。件数が
+  多い場合は`--format mermaid`または`--format json`を使うことを推奨する
 - **サブモジュールのimport失敗は警告として可視化される**: パッケージ内の
   1サブモジュールがimportに失敗しても、design-diffは解析全体を止めず、他の
   モジュールの解析を続ける(耐障害性)。ただし失敗したモジュール名は

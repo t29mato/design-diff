@@ -79,14 +79,34 @@ class TestCliDiffCommandWiring:
 
         assert received_repo_paths == [Path("/some/repo")]
 
-    def test_format_svg_prints_svg_produced_by_svg_renderer(self, capsys):
+    def test_format_svg_prints_svg_produced_by_github_style_svg_renderer(self, capsys):
+        """HQ #36/#38: --format svg の既定はmermaid非依存のネイティブSVG(GitHubStyleSvgRenderer)。"""
+
+        class FakeGitHubStyleSvgRenderer:
+            def render(self, diff, *, mermaid=None, meta=None) -> str:
+                assert diff is CANNED_RESULT.diff
+                return "<svg>native fake</svg>"
+
+        exit_code = main(
+            ["diff", "main", "feature", "--package", "pkg", "--format", "svg"],
+            use_case_factory=lambda repo_path: FakeUseCase(CANNED_RESULT),
+            github_style_svg_renderer_factory=FakeGitHubStyleSvgRenderer,
+        )
+
+        captured = capsys.readouterr()
+        assert exit_code == 0
+        assert captured.out.strip() == "<svg>native fake</svg>"
+
+    def test_format_svg_mermaid_prints_svg_produced_by_mermaid_cli_svg_renderer(self, capsys):
+        """旧実装(要mermaid-cli)は`--format svg-mermaid`として残置。"""
+
         class FakeSvgRenderer:
             def render(self, mermaid_text: str) -> str:
                 assert mermaid_text == CANNED_RESULT.mermaid
                 return "<svg>fake</svg>"
 
         exit_code = main(
-            ["diff", "main", "feature", "--package", "pkg", "--format", "svg"],
+            ["diff", "main", "feature", "--package", "pkg", "--format", "svg-mermaid"],
             use_case_factory=lambda repo_path: FakeUseCase(CANNED_RESULT),
             svg_renderer_factory=FakeSvgRenderer,
         )
@@ -95,13 +115,13 @@ class TestCliDiffCommandWiring:
         assert exit_code == 0
         assert captured.out.strip() == "<svg>fake</svg>"
 
-    def test_format_svg_prints_actionable_error_and_exits_nonzero_when_unavailable(self, capsys):
+    def test_format_svg_mermaid_prints_actionable_error_and_exits_nonzero_when_unavailable(self, capsys):
         class UnavailableSvgRenderer:
             def render(self, mermaid_text: str) -> str:
                 raise SvgRenderingUnavailableError("mermaid-cliが見つかりません。npm install ...")
 
         exit_code = main(
-            ["diff", "main", "feature", "--package", "pkg", "--format", "svg"],
+            ["diff", "main", "feature", "--package", "pkg", "--format", "svg-mermaid"],
             use_case_factory=lambda repo_path: FakeUseCase(CANNED_RESULT),
             svg_renderer_factory=UnavailableSvgRenderer,
         )

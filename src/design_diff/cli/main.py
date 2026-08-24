@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError, Py2pumlExtractor
+from design_diff.adapters.rendering.github_style_svg_renderer import GitHubStyleSvgRenderer
 from design_diff.adapters.rendering.json_renderer import JsonRenderer
 from design_diff.adapters.rendering.mermaid_renderer import MermaidRenderer
 from design_diff.adapters.rendering.svg_renderer import MermaidCliSvgRenderer, SvgRenderingUnavailableError
@@ -20,6 +21,7 @@ from design_diff.application.use_cases.compute_design_diff import ComputeDesignD
 
 UseCaseFactory = Callable[[Path | None], ComputeDesignDiffUseCase]
 SvgRendererFactory = Callable[[], MermaidCliSvgRenderer]
+GitHubStyleSvgRendererFactory = Callable[[], GitHubStyleSvgRenderer]
 
 
 def _default_use_case_factory(repo_path: Path | None) -> ComputeDesignDiffUseCase:
@@ -43,11 +45,14 @@ def _build_parser() -> argparse.ArgumentParser:
     diff_parser.add_argument("--package", required=True, help="解析対象のPythonパッケージ名")
     diff_parser.add_argument(
         "--format",
-        choices=["mermaid", "json", "svg"],
+        choices=["mermaid", "json", "svg", "svg-mermaid"],
         default="mermaid",
         help=(
-            "出力形式(既定: mermaid)。svgはローカルプレビュー用(要mermaid-cli)。"
-            "GitHub PRコメントはmermaidブロックをネイティブ描画するのでActionからはmermaid/jsonで十分"
+            "出力形式(既定: mermaid)。svgはGitHub diff風のネイティブSVG(外部依存なし、"
+            "メンバー単位の増減を色分けで表示。HQ #36/#38)。svg-mermaidは旧来の"
+            "mermaid-cli経由の変換(要mermaid-cli、メンバー単位の色分けは無い)。"
+            "GitHub PRコメントはmermaidブロックをネイティブ描画するのでActionからは"
+            "mermaid/jsonで十分"
         ),
     )
     diff_parser.add_argument(
@@ -66,6 +71,7 @@ def main(
     argv: list[str] | None = None,
     use_case_factory: UseCaseFactory = _default_use_case_factory,
     svg_renderer_factory: SvgRendererFactory = MermaidCliSvgRenderer,
+    github_style_svg_renderer_factory: GitHubStyleSvgRendererFactory = GitHubStyleSvgRenderer,
 ) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -96,6 +102,11 @@ def main(
         if args.format == "json":
             print(result.json_payload)
         elif args.format == "svg":
+            # HQ #36/#38: GitHub diff風のネイティブSVG(mermaid非依存、外部CLI不要)。
+            print(github_style_svg_renderer_factory().render(result.diff))
+        elif args.format == "svg-mermaid":
+            # 旧実装(要mermaid-cli)。メンバー単位の色分けは無いが、mermaid-cliが
+            # 生成する見た目そのままを確認したい場合のために残す。
             try:
                 svg = svg_renderer_factory().render(result.mermaid)
             except SvgRenderingUnavailableError as error:

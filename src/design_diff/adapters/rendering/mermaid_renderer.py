@@ -36,16 +36,22 @@
   (Mermaidの `+`/`-` は可視性(public/private)の意味で予約されているため、
   診断結果の追加/削除をメンバー行の先頭に流用しない。noteの中はプレーンテキストなので
   git diff風の `+`/`-` を安全に使える)
-- **メンバー(property/method)単位の増減は、行末のASCIIタグで示す**(レビュー
-  フィードバック: クラス単位の色分けだけでは「どのメンバーが変わったか」が
-  分からない)。`style`文はノード(クラス)単位のスタイリング機構であり、Mermaidの
-  classdiagramにはメンバー行1つ1つに個別のstyleを当てる機構が存在しない。
-  カスタムSVGでのメンバー単位色分けも検討したが、GitHub実機検証で生の`<svg>`タグ・
-  `<img src="data:...">`のいずれもサニタイザーに除去されることを確認しており、
-  GitHub PRコメントへの埋め込み手段としては使えない。そのため追加行の末尾に`[+]`、
-  変更行の末尾に`[~]`(型変更時は`(was: <旧の型>)`も付記)を付け、削除された
-  属性/メソッドもhead時点にはもう存在しないが`[-]`付きで本体の中に追加表示する
-  (note の差分サマリだけでなく、クラス本体を見るだけで変化点が分かるようにする)
+- **メンバー(property/method)単位の増減は、行頭の絵文字マーカーで示す**(➕追加/
+  ➖削除/🔀変更、型変更時は`(was: <旧の型>)`も付記)。`style`文はノード(クラス)
+  単位のスタイリング機構であり、Mermaidのclassdiagramにはメンバー行1つ1つに
+  個別のstyleを当てる機構が存在しない(公式ドキュメント・GitHub issueで確認済み。
+  §7参照)。カスタムSVGでのメンバー単位色分けも検討したが、GitHub実機検証で生の
+  `<svg>`タグ・`<img src="data:...">`のいずれもサニタイザーに除去されることを
+  確認しており、GitHub PRコメントへの埋め込み手段としては使えない。
+  当初はASCIIサフィックスタグ(`[+]`/`[-]`/`[~]`)を採用していたが、HQ #36の
+  デモ図との品質比較で「視覚的な顕著性が足りない」と差し戻され、行頭の絵文字
+  マーカーに変更した(色付きグリフとして一目で判別できることをGitHub実機で
+  確認済み。§7参照)。**削除された行にはさらにUnicode取り消し線合成
+  (U+0336)でテキスト自体にも取り消し線を引く**(git diffの取り消し線表現に
+  近い視覚効果。フォントで崩れないかをスパイクでGitHub実機検証済み。§7参照)。
+  削除された属性/メソッドもhead時点にはもう存在しないが➖付きで本体の中に
+  追加表示する(note の差分サマリだけでなく、クラス本体を見るだけで変化点が
+  分かるようにする)
 - 変更のないクラスは出さない(ノイズ削減)。リレーションの参照先が非変更クラスの
   場合のみ、文脈として装飾なしのラベルだけを宣言する
 - **図のサイズ制御(追加要件)**: 変更クラス数が `max_classes`(既定20)を超えたら、
@@ -84,10 +90,10 @@ _STYLE_COLOR = {
     "modified": ("#fff8e6", "#b08800"),
 }
 
-_MEMBER_DIFF_TAG = {
-    "added": "[+]",
-    "removed": "[-]",
-    "changed": "[~]",
+_MEMBER_DIFF_EMOJI = {
+    "added": "➕",
+    "removed": "➖",
+    "changed": "🔀",
 }
 
 _RELATION_ARROW = {
@@ -175,16 +181,52 @@ def _class_body(cls: ClassIR) -> list[str]:
     return lines
 
 
+def _prefix_member_line(line: str, emoji: str) -> str:
+    """メンバー行の先頭(インデントの直後)に絵文字マーカーを差し込む。
+
+    HQ #36の品質判定(差し戻し): メンバー単位の増減は行末のASCIIタグでは
+    視覚的な顕著性が足りないという指摘を受け、行**頭**の絵文字グリフに変更した
+    (色付きの視覚要素として一目で判別できるようにするため。architecture.md §7)。
+    """
+    stripped = line.lstrip(" ")
+    indent = line[: len(line) - len(stripped)]
+    return f"{indent}{emoji} {stripped}"
+
+
+_STRIKETHROUGH_COMBINING_MARK = "̶"  # COMBINING LONG STROKE OVERLAY
+
+
+def _strikethrough(text: str) -> str:
+    """テキストにUnicode取り消し線合成文字を1文字ずつ付けて取り消し線を表現する。
+
+    HQ #36の品質判定(差し戻し)で「削除メンバーには絵文字に加えて、可能なら
+    Unicodeの取り消し線合成も試す(フォント依存で崩れるなら不採用でよい)」と
+    指示された。スパイク(docs/design/spikes/member-emoji-markers-spike.md、
+    検証後に削除)でGitHub実レンダリングを確認したところ、クラス名・属性名・
+    括弧を含む行全体に崩れず綺麗に取り消し線が引かれることを確認できたため採用。
+    """
+    return "".join(f"{ch}{_STRIKETHROUGH_COMBINING_MARK}" for ch in text)
+
+
+def _removed_member_line(line: str) -> str:
+    """削除されたメンバー行: ➖マーカーに加え、行内容全体に取り消し線を引く。"""
+    stripped = line.lstrip(" ")
+    indent = line[: len(line) - len(stripped)]
+    return f"{indent}{_MEMBER_DIFF_EMOJI['removed']} {_strikethrough(stripped)}"
+
+
 def _modified_class_body(mod: ClassModification) -> list[str]:
-    """変更されたクラスの本体を、メンバー行単位のASCIIタグ付きで組み立てる。
+    """変更されたクラスの本体を、メンバー行単位の絵文字マーカー付きで組み立てる。
 
     レビューフィードバック: クラス単位の色分け(style文)だけでは「そのクラスの
     どのproperty/methodが増えた/減ったか」までは分からない。Mermaidの
-    classDiagramはメンバー行1つ1つにstyle(色)を当てる機構を持たないため、
-    色ではなくASCIIタグ(`[+]`追加/`[-]`削除/`[~]`変更)をメンバー行自体に
-    直接付けることで、クラス本体を見るだけで差分が分かるようにする。
-    削除されたメンバーもhead時点には存在しないが、`[-]`付きでこの本体の中に
-    表示する(これまではnoteだけにしか出ておらず、本体だけでは分からなかった)。
+    classDiagramはメンバー行1つ1つにstyle(色)を当てる機構を持たないため
+    (公式ドキュメントで確認済み。architecture.md §7)、色ではなく絵文字マーカー
+    (➕追加/➖削除/🔀変更)をメンバー行の先頭に直接付けることで、クラス本体を
+    見るだけで差分が分かるようにする。削除されたメンバーもhead時点には存在
+    しないが、➖マーカーとUnicode取り消し線合成(`_strikethrough`)の両方付きで
+    この本体の中に表示する(これまではnoteだけにしか出ておらず、本体だけでは
+    分からなかった)。
     """
     added_attrs = {a.name for a in mod.attributes.added}
     changed_attrs = {c.name: c for c in mod.attributes.changed}
@@ -192,26 +234,26 @@ def _modified_class_body(mod: ClassModification) -> list[str]:
     for attribute in mod.head_class.attributes:
         line = _render_attribute_line(attribute)
         if attribute.name in added_attrs:
-            line += f"  {_MEMBER_DIFF_TAG['added']}"
+            line = _prefix_member_line(line, _MEMBER_DIFF_EMOJI["added"])
         elif attribute.name in changed_attrs:
             old_type = changed_attrs[attribute.name].old_type
             extra = f" (was: {old_type})" if old_type is not None else ""
-            line += f"  {_MEMBER_DIFF_TAG['changed']}{extra}"
+            line = _prefix_member_line(line, _MEMBER_DIFF_EMOJI["changed"]) + extra
         lines.append(line)
     for removed_attr in mod.attributes.removed:
-        lines.append(f"{_render_attribute_line(removed_attr)}  {_MEMBER_DIFF_TAG['removed']}")
+        lines.append(_removed_member_line(_render_attribute_line(removed_attr)))
 
     added_methods = {m.name for m in mod.methods.added}
     changed_methods = {c.name for c in mod.methods.changed}
     for method in mod.head_class.methods:
         line = _render_method_line(method)
         if method.name in added_methods:
-            line += f"  {_MEMBER_DIFF_TAG['added']}"
+            line = _prefix_member_line(line, _MEMBER_DIFF_EMOJI["added"])
         elif method.name in changed_methods:
-            line += f"  {_MEMBER_DIFF_TAG['changed']}"
+            line = _prefix_member_line(line, _MEMBER_DIFF_EMOJI["changed"])
         lines.append(line)
     for removed_method in mod.methods.removed:
-        lines.append(f"{_render_method_line(removed_method)}  {_MEMBER_DIFF_TAG['removed']}")
+        lines.append(_removed_member_line(_render_method_line(removed_method)))
 
     return lines
 

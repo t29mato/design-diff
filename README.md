@@ -27,10 +27,12 @@ classDiagram
     namespace shop.models {
         class shop_models_Cart["[~] Cart"] {
             +items: List[Product]
-            +discount_code: Optional[DiscountCode]  [+]
+            ➕ +discount_code: Optional[DiscountCode]
+            ➖ +̶l̶e̶g̶a̶c̶y̶_̶n̶o̶t̶e̶s̶:̶ ̶s̶t̶r̶
             +add(product: Product): None
-            +apply_code(code: DiscountCode): None  [+]
+            ➕ +apply_code(code: DiscountCode): None
             +total(): float
+            ➖ +̶s̶e̶n̶d̶_̶l̶e̶g̶a̶c̶y̶_̶r̶e̶c̶e̶i̶p̶t̶(̶)̶:̶ ̶N̶o̶n̶e̶
         }
         class shop_models_DiscountCode["[+] DiscountCode"] {
             +code: str
@@ -43,13 +45,16 @@ classDiagram
     style shop_models_Cart fill:#fff8e6,stroke:#b08800,stroke-width:2px,color:#b08800
     style shop_models_DiscountCode fill:#e6ffed,stroke:#22863a,stroke-width:2px,color:#22863a
     style shop_models_LegacyCouponBanner fill:#ffeef0,stroke:#b31d28,stroke-width:2px,color:#b31d28
-    shop_models_Cart *-- shop_models_DiscountCode
+    shop_models_Cart *-- shop_models_DiscountCode : new
 ```
 
 `DiscountCode`クラスの追加(緑)、`LegacyCouponBanner`クラスの削除(赤)、`Cart`の
-変更(黄。`discount_code`/`apply_code()`が新しく増えたメンバーだと行末の`[+]`で
-分かる)、`Cart *-- DiscountCode`という新しいコンポジション依存が、1枚の図に
-収まっている。
+変更(黄)が、1枚の図に収まっている。`Cart`は追加プロパティ・追加メソッド・
+削除プロパティ・削除メソッドの4種類全てを含む例になっている:
+`discount_code`/`apply_code()`が新しく増えたメンバーは行頭の➕で、
+`legacy_notes`/`send_legacy_receipt()`のように無くなったメンバーは行頭の➖と
+取り消し線の両方で分かる。`Cart *-- DiscountCode`という新しいコンポジション
+依存にも矢印ラベルで`: new`が付く。
 
 ## 使い方
 
@@ -101,10 +106,10 @@ npm install -g @mermaid-js/mermaid-cli   # SVG出力を使うなら一度だけ
   ラベルのASCIIタグに加えて、`style`文で実際に色も付く(追加=緑/削除=赤/変更=黄、
   クラス単位)。詳細は下記「表示に関する注記」を参照
 - **変更されたクラスは、どのproperty/methodが増減したかをメンバー行自体に示す**。
-  追加された属性/メソッドの行末に`[+]`、変更された行末に`[~]`(型変更の場合は
+  追加された属性/メソッドの行頭に➕、変更された行頭に🔀(型変更の場合は
   `(was: <旧の型>)`も付く)。削除された属性/メソッドはheadにはもう存在しないが、
-  クラス本体の中に`[-]`付きで表示される(クラス単位の`note`要約とは別に、本体を
-  見るだけで「このクラスの何が変わったか」まで分かるようにするため)
+  クラス本体の中に➖付き・取り消し線付きで表示される(クラス単位の`note`要約とは
+  別に、本体を見るだけで「このクラスの何が変わったか」まで分かるようにするため)
 - 可視性マーカー `+`(public) / `-`(private) で、アンダースコア始まりのメンバーを
   区別する。クラスの公開APIが一目で分かる
 - 変更のないクラスは図に出さない(ノイズ削減)
@@ -134,17 +139,22 @@ GitHub固有の裏技ではなく標準Mermaid構文なので、GitLab等の他�
 ことで、GitHub実機でタイトル・メンバー行とも状態色で塗られることを確認済み。
 
 **ただし`style`文はノード(クラス)単位にしか色を当てられず、メンバー(property/
-method)1つ1つには適用できない**。そのため「このクラスの、どのproperty/method
-そのものが増えた/減ったか」は色ではなくメンバー行自体へのASCIIタグ(`[+]`/`[-]`/`[~]`)
-で表現している。カスタムSVGでメンバー単位の色分けを実現する案も検討したが、
-GitHub上で生の`<svg>`タグと`<img src="data:...">`の両方が実機検証でサニタイズ
-(除去)されることを確認しており、GitHub PRコメントへ直接埋め込む手段としては
-使えない(README/ローカルファイルとしてなら`--format svg`で問題なく使える)。
+method)1つ1つには適用できない**(Mermaid公式ドキュメント・GitHub issueで確認済み。
+[docs/design/architecture.md](./docs/design/architecture.md) §7参照)。カスタムSVGで
+メンバー単位の色分けを実現する案も検討したが、GitHub上で生の`<svg>`タグと
+`<img src="data:...">`の両方が実機検証でサニタイズ(除去)されることを確認しており、
+GitHub PRコメントへ直接埋め込む手段としては使えない(README/ローカルファイルとして
+なら`--format svg`で問題なく使える)。
 
-絵文字(🟢/🔴/🟡)による代替も検討したが、環境によって絵文字グリフを持たない場合が
-あり、グローバルな利用を前提にできないため不採用とした。ASCIIタグ(`[+]`/`[-]`/`[~]`)
-は色分けの冗長化として残している(色覚特性やカラー非対応ビューアでも状態が
-読み取れるようにするため)。JSON出力やnote内の差分表記とも記法が一貫している。
+そのため「このクラスの、どのproperty/methodそのものが増えた/減ったか」は、色では
+なく**メンバー行の先頭に付ける絵文字マーカー**(➕追加/➖削除/🔀変更)で表現している。
+削除された行にはさらにUnicode取り消し線合成(U+0336)でテキスト自体にも取り消し線を
+引く(git diffの取り消し線表現に近い視覚効果)。当初はASCIIサフィックスタグ
+(`[+]`/`[-]`/`[~]`)を採用していたが、実際のデモ図との品質比較で「視覚的な顕著性が
+足りない」という指摘を受け、行頭の絵文字マーカーに変更した。絵文字・取り消し線とも
+GitHub実機で崩れずに描画されることを確認済み。JSON出力やnote内の差分表記(`+`/`-`/`~`)
+とは記法が異なるが、noteのプレーンテキスト表記は絵文字非対応ビューア向けの
+フォールバックとして引き続き機能する。
 
 ## GitHub Action(PRコメント自動投稿)
 

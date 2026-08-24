@@ -37,6 +37,13 @@ from design_diff.domain.model import AttributeIR, ClassIR, MethodIR, ParameterIR
 EMPTY_DIFF = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff())
 
 
+def struck(text: str) -> str:
+    """mermaid_rendererの取り消し線合成(U+0336 COMBINING LONG STROKE OVERLAY)
+    と同じ変換をテスト側で再現する(削除メンバー行のアサーション用)。
+    """
+    return "".join(f"{ch}̶" for ch in text)
+
+
 def make_class(fqn, attributes=(), methods=(), is_abstract=False) -> ClassIR:
     return ClassIR(
         fqn=fqn, name=fqn.rsplit(".", 1)[-1], is_abstract=is_abstract, attributes=attributes, methods=methods
@@ -233,13 +240,15 @@ class TestMermaidRendererModified:
 
 
 class TestMermaidRendererMemberLevelDiff:
-    """レビューフィードバック: クラス単位の色分けだけでは「そのクラスのどの
-    property/methodが増えた/減ったか」が分からない。クラス本体のメンバー行
-    それぞれに、追加/削除/変更を示すASCIIタグを直接付ける。Mermaidの
-    classDiagramはメンバー行単位のstyle(色)を持たないため、色ではなくタグで表現する。
+    """HQ #36の品質判定(差し戻し): メンバー単位の増減が図の中で**視覚的に一目で
+    分かること**が合格基準。従来のASCIIサフィックスタグ(`[+]`等)は情報としては
+    存在するが視覚的な顕著性が足りないという指摘を受け、メンバー行の**先頭**に
+    絵文字マーカー(➕追加/➖削除/🔀変更)を付ける形に変更した。Mermaidの
+    classDiagramはメンバー行単位のstyle(色)を持たないため(公式ドキュメントで
+    確認済み。architecture.md §7参照)、色ではなく絵文字グリフで表現する。
     """
 
-    def test_added_attribute_gets_a_plus_tag_on_its_own_line(self):
+    def test_added_attribute_gets_a_plus_emoji_prefix(self):
         base = make_class("pkg.models.Car")
         head = make_class("pkg.models.Car", attributes=(AttributeIR(name="battery", type="Battery"),))
         mod = ClassModification(
@@ -254,11 +263,13 @@ class TestMermaidRendererMemberLevelDiff:
 
         output = MermaidRenderer().render(diff)
 
-        assert "+battery: Battery  [+]" in output
+        assert "➕ +battery: Battery" in output
 
-    def test_removed_attribute_is_shown_in_the_class_body_with_a_minus_tag(self):
-        """headにはもう存在しない属性でも、クラス本体の中に`[-]`付きで表示する
-        (これまではnoteだけにしか出ておらず、本体を見ただけでは分からなかった)。
+    def test_removed_attribute_is_shown_in_the_class_body_with_a_minus_emoji(self):
+        """headにはもう存在しない属性でも、クラス本体の中に➖付き・取り消し線
+        付きで表示する(これまではnoteだけにしか出ておらず、本体を見ただけでは
+        分からなかった)。取り消し線はUnicode合成文字(U+0336)で、GitHub実機
+        検証(スパイク)で崩れずに描画されることを確認済み(architecture.md §7)。
         """
         base = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="List[Wheel]"),))
         head = make_class("pkg.models.Car")
@@ -274,9 +285,9 @@ class TestMermaidRendererMemberLevelDiff:
 
         output = MermaidRenderer().render(diff)
 
-        assert "+wheels: List[Wheel]  [-]" in output
+        assert f"➖ {struck('+wheels: List[Wheel]')}" in output
 
-    def test_changed_attribute_type_gets_a_tilde_tag_with_the_old_type(self):
+    def test_changed_attribute_type_gets_a_shuffle_emoji_with_the_old_type(self):
         base = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="int"),))
         head = make_class("pkg.models.Car", attributes=(AttributeIR(name="wheels", type="List[Wheel]"),))
         mod = ClassModification(
@@ -301,9 +312,9 @@ class TestMermaidRendererMemberLevelDiff:
 
         output = MermaidRenderer().render(diff)
 
-        assert "+wheels: List[Wheel]  [~] (was: int)" in output
+        assert "🔀 +wheels: List[Wheel] (was: int)" in output
 
-    def test_unchanged_attribute_has_no_diff_tag(self):
+    def test_unchanged_attribute_has_no_diff_emoji(self):
         unchanged = AttributeIR(name="name", type="str")
         base = make_class("pkg.models.Car", attributes=(unchanged, AttributeIR(name="wheels", type="int")))
         head = make_class("pkg.models.Car", attributes=(unchanged,))
@@ -320,9 +331,9 @@ class TestMermaidRendererMemberLevelDiff:
         output = MermaidRenderer().render(diff)
 
         line = next(line for line in output.splitlines() if "+name: str" in line)
-        assert "[" not in line  # 未変更メンバーにはタグを付けない
+        assert not any(e in line for e in ("➕", "➖", "🔀"))  # 未変更メンバーにはマーカーを付けない
 
-    def test_added_method_gets_a_plus_tag(self):
+    def test_added_method_gets_a_plus_emoji_prefix(self):
         base = make_class("pkg.models.Car")
         head = make_class(
             "pkg.models.Car", methods=(MethodIR(name="honk", parameters=(), return_type="None"),)
@@ -339,9 +350,9 @@ class TestMermaidRendererMemberLevelDiff:
 
         output = MermaidRenderer().render(diff)
 
-        assert "+honk(): None  [+]" in output
+        assert "➕ +honk(): None" in output
 
-    def test_removed_method_is_shown_in_the_class_body_with_a_minus_tag(self):
+    def test_removed_method_is_shown_in_the_class_body_with_a_minus_emoji(self):
         base = make_class(
             "pkg.models.Car", methods=(MethodIR(name="honk", parameters=(), return_type="None"),)
         )
@@ -358,9 +369,9 @@ class TestMermaidRendererMemberLevelDiff:
 
         output = MermaidRenderer().render(diff)
 
-        assert "+honk(): None  [-]" in output
+        assert f"➖ {struck('+honk(): None')}" in output
 
-    def test_changed_method_gets_a_tilde_tag(self):
+    def test_changed_method_gets_a_shuffle_emoji(self):
         old_method = MethodIR(name="apply_discount", parameters=(), return_type="float")
         new_method = MethodIR(
             name="apply_discount",
@@ -383,7 +394,7 @@ class TestMermaidRendererMemberLevelDiff:
 
         output = MermaidRenderer().render(diff)
 
-        assert "+apply_discount(code: str): float  [~]" in output
+        assert "🔀 +apply_discount(code: str): float" in output
 
 
 class TestMermaidRendererColorStyling:

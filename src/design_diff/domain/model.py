@@ -62,3 +62,11 @@ class SnapshotIR:
     # サブモジュールのモジュール名。空でない場合、classes/relationsは対象
     # パッケージ全体を網羅していない可能性がある(部分解析)。
     skipped_modules: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _VerifySvgActionIntegrationMarker:
+    """検証用: SVG画像埋め込みAction統合の実PR確認のためだけに追加する一時クラス。
+    確認後にこのブランチごと削除する(mainにはマージしない)。"""
+
+    note: str = "temporary marker for design-diff-assets verification"

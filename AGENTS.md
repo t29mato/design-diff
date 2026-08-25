@@ -36,8 +36,9 @@ uv run coverage report --include="src/design_diff/domain/*" --fail-under=90  # �
 
 - **クリーンアーキテクチャ**: `domain`(純粋なIR+diffアルゴリズム。py2puml/git/GitHub
   APIに一切依存しない)→ `application`(Protocolベースのport + use case)→
-  `adapters`(py2puml抽出・git worktree・Mermaid/JSON/SVGレンダリング・GitHub
-  コメント投稿)→ `cli`/`action`(composition root)。依存方向は
+  `adapters`(py2puml抽出・git worktree・Mermaid/JSON/GitHub diff風ネイティブSVG
+  レンダリング・GitHubコメント投稿・design-diff-assetsブランチへのSVGアセット
+  公開)→ `cli`/`action`(composition root)。依存方向は
   `cli|action → application → adapters → domain` のみ
 - **import-linterの4契約を緩めない**(`.importlinter`)。レイヤー違反でCIが落ちる
   設計は意図的なもので、緩和にはメンテナの承認が必要
@@ -66,5 +67,8 @@ uv run coverage report --include="src/design_diff/domain/*" --fail-under=90  # �
 ```bash
 uv run design-diff diff main <your-branch> --package design_diff --format mermaid
 ```
+
+画像として確認したい場合(GitHub diff風のネイティブSVG。PRコメントで実際に
+使われる形式)は `--format svg > diagram.svg` でファイルに出力してから開く。
 
 出力例は [docs/examples/](./docs/examples/) を参照。

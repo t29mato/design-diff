@@ -51,11 +51,15 @@ design-diff diff main feature/my-branch --package myapp --format mermaid
 
 ## どこでプレビューするか(重要)
 
-- **GitHubのPRコメント**: GitHubは ```` ```mermaid ```` フェンスで囲まれたコードブロックを
-  ネイティブにクラス図としてレンダリングする。design-diffのGitHub Actionワークフロー
-  (`.github/workflows/design-diff-comment.yml`)はこの形式でコメントを投稿するので、
-  **追加の設定なしにPR上で絵として見える**。README上のMermaidブロックも同様に
-  GitHub上でプレビューされる(このREADME自体、[docs/examples/](./docs/examples/)の
+- **GitHubのPRコメント**: design-diffのGitHub Actionワークフロー
+  (`.github/workflows/design-diff-comment.yml`)は、GitHub diff風のネイティブSVGを
+  `<img>`としてコメント本文に直接埋め込む(生成したSVGをリポジトリの
+  `design-diff-assets`ブランチにコミットし、raw URL経由で参照する。下記
+  「GitHub Action」参照)。**追加の設定なしにPR上で画像として見える**。
+  Mermaidブロックも`<details>`内のフォールバックとして併記されるので、
+  画像が読み込めない環境やテキストとして差分を読みたい場合はそちらを開く。
+  README上のMermaidブロックは(コメントとは別に)GitHub上でそのまま
+  プレビューされる(このREADME自体、[docs/examples/](./docs/examples/)の
   ブロックがその実例)
 - **ローカルCLI利用時**: `--format svg`(既定・後述)でGitHub diff風のSVGファイルを
   直接出力できる。ターミナルにMermaidのテキストが出るだけでは味気ない場合、
@@ -151,36 +155,49 @@ design-diff固有の不具合ではなく、Mermaid本体側の既知の問題
 と段階的に改善を試みたが、いずれもオーナーから「GitHubのコードdiffのように視覚的に
 一目で分かる形にしてほしい」という差し戻しを受けた。**Mermaidという土俵の中での
 改善には限界がある**という結論に至り、design-diff自身が直接SVGを生成する
-`GitHubStyleSvgRenderer`(`--format svg`)を実装した。GitHub上で生の`<svg>`タグ・
-`<img src="data:...">`の直接埋め込みはサニタイザーに除去されることを実機検証済み
-のため、PRコメントへの埋め込みは別の仕組み(生成したSVGをリポジトリにコミットし、
-raw URL経由で`<img>`参照する)で対応する予定(実装中。完了後にここを更新する)。
-ローカルファイル/README上ならこのSVGはそのまま使える。
+`GitHubStyleSvgRenderer`(`--format svg`)を実装し、**オーナー合格**を得た。
+GitHub上で生の`<svg>`タグ・`<img src="data:...">`の直接埋め込みはサニタイザーに
+除去されることを実機検証済みのため、PRコメントへの埋め込みは別の仕組み(生成した
+SVGを`design-diff-assets`ブランチにコミットし、raw URL経由で`<img>`参照する)で
+対応している(下記「GitHub Action」参照)。ローカルファイル/README上ならこのSVGは
+そのまま使える。
 
 ## GitHub Action(PRコメント自動投稿)
 
 `.github/workflows/design-diff-comment.yml` は、PRのopen/更新のたびにbase...headの
-設計diffを計算し、Mermaidブロックをコメントとして投稿する。
+設計diffを計算し、GitHub diff風のSVGを`<img>`として埋め込んだコメントを投稿する。
 
+- **SVGはリポジトリにコミットして埋め込む**: GitHubのコメント本文は生の`<svg>`
+  タグ・data URIの`<img>`をサニタイザーで除去してしまうため、生成したSVGを
+  `design-diff-assets`という専用のオーファンブランチ(mainの履歴とは無関係な
+  独立した履歴)へコミットし、`raw.githubusercontent.com/{owner}/{repo}/{コミット
+  SHA}/assets/pr-{PR番号}.svg`というURLで`<img src="...">`から参照する。URLに
+  ブランチ名ではなくコミットSHAを使うのは、raw.githubusercontent.comのCDN
+  キャッシュによる更新直後の古い内容表示を避けるため(SHAは不変なので、push
+  のたびに新しいSHA=新しいURLを発行すればキャッシュ汚染が起きない)
+- **Mermaidブロックは`<details>`内のフォールバックとして併記**: 画像が読み込め
+  ない環境や、テキストとして差分を読みたいレビュアーのために残している
 - **コメントはupsertする**: 同一PRで何度pushしても新規コメントは積み上がらず、
   隠しマーカー(`<!-- design-diff:auto-comment -->`)で見つけた既存コメントを更新する。
   通知の洪水を避けるため
 - **沈黙原則**: `has_changes` が false(クラス構造に変化なし)**かつ** `warnings`
-  が空(解析はパッケージ全体を網羅できた)のときだけ、コメント自体を投稿しない。
-  サブモジュールのimport失敗等で解析が部分的だった場合(`warnings`が非空)は、
-  クラス差分が皆無でも「変更なしに見えるが解析は部分的だった」ことを伝えるため
-  コメントを投稿する
+  が空(解析はパッケージ全体を網羅できた)のときだけ、コメント自体を投稿しない
+  (この場合はSVGの生成・公開自体も行わず、design-diff-assetsブランチに不要な
+  コミットを積み上げない)。サブモジュールのimport失敗等で解析が部分的だった
+  場合(`warnings`が非空)は、クラス差分が皆無でも「変更なしに見えるが解析は
+  部分的だった」ことを伝えるためコメントを投稿する
 - **セキュリティ**: `pull_request_target` は使わない。フォークからのPRは
   ジョブ自体をスキップする(`if: github.event.pull_request.head.repo.full_name ==
   github.repository`)ため、信頼できないコードに対してpy2pumlのimportベース解析を
   実行することも、シークレットを渡すこともない。使うのは自動発行される
-  `GITHUB_TOKEN` のみ(`permissions: pull-requests: write` で最小権限に絞る)
+  `GITHUB_TOKEN` のみ(`permissions: contents: write, pull-requests: write`。
+  `contents: write`はdesign-diff-assetsブランチへのpushに必要な最小権限)
 
 **動作確認済み**: design-diffはpublicリポジトリなのでGitHub Actionsは無料枠が
 無制限。実際にPRを作成し、`gh`での手動実行ではなく本物のpull_requestイベント
-経由で本ワークフローが自動実行され、コメントが投稿されてMermaid図として描画
-されること、2回目以降のpushで同一コメントがupsertされること(新規コメントが
-積み上がらない)、構造変化の無いPRではコメント自体が投稿されないこと(沈黙
+経由で本ワークフローが自動実行され、コメントが投稿されて画像として描画される
+こと、2回目以降のpushで同一コメントがupsertされ画像も差し替わること(新規コメント
+が積み上がらない)、構造変化の無いPRではコメント自体が投稿されないこと(沈黙
 原則)を確認済み。
 
 ## JSON出力(LLMO / AIレビュアー向け)

@@ -12,7 +12,11 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  # contents: write は design-diff-assets オーファンブランチへSVGをコミット・
+  # pushするために必要(HQ #36/#38の仕上げ: PRコメントへのSVG画像埋め込み)。
+  # フォークPRはこのジョブ自体が下のif条件でスキップされるため、信頼できない
+  # コードに対してこの権限が使われることはない。
+  contents: write
   pull-requests: write
 
 jobs:

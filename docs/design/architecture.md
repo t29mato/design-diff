@@ -766,11 +766,60 @@ v5で確認済みの通り、Mermaid classDiagramはメンバー単位のスタ�
 非常に多いPRでは図が縦に長くなり続ける。README Limitationsに記載し、
 必要なら`--format mermaid`/`json`を使うよう案内している。
 
-**未完了(段階的実装、次のフェーズ)**: GitHub PRコメントへのSVG埋め込み。
-GitHub上で生の`<svg>`タグ・`<img src="data:...">`はいずれもサニタイザーに
-除去されることを実機検証済み(§7参照)なので、生成したSVGをリポジトリの
-専用ブランチにコミットし、`raw.githubusercontent.com`のURLで`<img>`参照する
-方式をHQが指定している。実装中。
+**当初の未完了事項(段階的実装)**: GitHub PRコメントへのSVG埋め込み。§7.3で
+対応した。
+
+### 7.3 GitHub PRコメントへのSVG埋め込み(HQ #36/#38の仕上げ)
+
+オーナー合格後、HQの指示で最後の統合作業に着手した。GitHub上で生の`<svg>`タグ・
+`<img src="data:...">`はいずれもサニタイザーに除去されることを実機検証済み
+(§7)なので、**生成したSVGをリポジトリの専用ブランチにコミットし、
+`raw.githubusercontent.com`のURLで`<img>`参照する**、という別のアーキテクチャで
+対応する。
+
+**新しいポート`AssetPort`**(`application/ports.py`): `publish(path, content,
+message) -> str`。diffの可視化アセット(SVG)を永続化し、参照可能なURLを返す。
+`CommentPort`と同様、application層はこのProtocolの「形」だけを要求し、
+具象実装(adapters)をimportしない(DIPの機械的強制。§2.2と同じ設計判断)。
+
+**実装`GitOrphanBranchAssetPublisher`**(`adapters/github/asset_publisher.py`):
+- `git`をサブプロセスとして呼ぶ(`gh` CLIの`comment_poster.py`、`git`直接呼び出し
+  の`git_worktree.py`と同じ、HTTPクライアント依存を増やさない方針)
+- 対象ブランチ(既定`design-diff-assets`)が既に存在するかを`git fetch origin
+  <branch>`の成否で判定する。存在すれば`FETCH_HEAD`からworktreeを作り、
+  存在しなければ現在のHEADからworktreeを作った上で`git checkout --orphan
+  <branch>` → `git rm -rf .`し、mainの履歴と一切共有しない独立した履歴にする
+  (標準的なgitのオーファンブランチ作成レシピ)
+- **URLにはブランチ名ではなくコミットSHAを使う**
+  (`raw.githubusercontent.com/{owner}/{repo}/{sha}/{path}`)。ブランチ名参照だと
+  raw.githubusercontent.comのCDNキャッシュにより、push直後は古い内容が返り
+  続ける可能性がある。コミットSHA参照は同じSHAに対する内容が不変なため、
+  pushのたびに新しいSHA(=新しいURL)を発行すればキャッシュ汚染の心配がない
+  (コメントをupsertするたびに、そのpush時点のSHAを含む新しいURLに差し替わる)
+- 呼び出し元のメインチェックアウト(worktree)の状態は変更しない
+  (`git worktree add`/`git worktree remove`で後片付けする)
+- テストは`git_worktree.py`のテストと同じ流儀(実git操作、モックしない)。
+  ローカルのbareリポジトリを模擬リモートとして使い、実際にpushされた内容を
+  別途cloneして検証する
+
+**`PostDesignDiffCommentUseCase`の変更**: `svg_renderer: RendererPort`と
+`asset_port: AssetPort`を新たに注入する。`has_changes`または`warnings`が
+真の場合、`GitHubStyleSvgRenderer`でSVGをレンダリングし、`AssetPort.publish()`
+で`assets/pr-{pr}.svg`として公開してURLを得た上で、コメント本文を
+`<img src="{url}">` + `<details><summary>Mermaid (fallback)</summary>...
+</details>`の形に組み立てる。**沈黙する場合(変更なし かつ 警告なし)は
+SVGの生成・公開自体も行わない**(不要なコミットをオーファンブランチに
+積み上げない)。
+
+**ワークフローの権限変更**: `design-diff-assets`ブランチへのpushには
+`contents: write`が必要なため、`permissions.contents`を`read`から`write`に
+変更した。フォークPRはジョブ自体をスキップする既存のif条件は変更していない
+(信頼できないコードに対してこの権限が使われることはない)。
+
+**検証**: 自リポジトリで実際にPRを作成し、本物のpull_requestイベント経由で
+ワークフローが自動実行され、SVGが`design-diff-assets`ブランチにコミットされ、
+コメントの`<img>`がGitHub上で実際に描画されることを確認する(手動`gh`実行では
+なく実PR経由での確認、という既存の検証方針に倣う)。
 
 ---
 

@@ -5,9 +5,12 @@
 
 ## [Unreleased]
 
-デモ図と実出力の品質比較(HQ #36)で見つかった2件の改善候補への対応。
-1件目(リレーションのラベル)を実装後、2件目(メンバー単位の視覚的顕著性)に
-ついてオーナーから差し戻しがあり、追加で対応した。
+## [0.3.0] - 2026-08-25
+
+**目玉**: GitHub diff風のネイティブSVGレンダラーを実装し、GitHub PRコメントへの
+画像埋め込みまで完成させた。**オーナー合格**(「十分達していると思います」)。
+デモ図と実出力の品質比較(HQ #36)で見つかった2件の改善候補への対応から始まり、
+3度の差し戻しを経てこの形に到達した。
 
 ### Changed
 
@@ -50,6 +53,25 @@ issueで確認済み)、**design-diff自身が直接SVGを生成するネイテ�
   色分けは無い)
 - README冒頭の出力例を、このSVG(`docs/images/shop-discount-codes.svg`)に
   差し替えた
+- **GitHub PRコメントへのSVG画像埋め込みを実装した**(HQ #36/#38の仕上げ)。
+  `AssetPort`(新規ポート)+`GitOrphanBranchAssetPublisher`
+  (`adapters/github/asset_publisher.py`): 生成したSVGを`design-diff-assets`
+  という専用のオーファンブランチ(mainの履歴とは無関係)へコミットし、
+  `raw.githubusercontent.com/{owner}/{repo}/{コミットSHA}/assets/pr-{PR番号}.svg`
+  というURLで`<img>`から参照する。URLにブランチ名ではなくコミットSHAを使うのは、
+  raw.githubusercontent.comのCDNキャッシュによる更新直後の古い内容表示を
+  避けるため。従来のMermaidブロックは`<details><summary>Mermaid (fallback)
+  </summary>...</details>`として同じコメント内に残す(画像が読み込めない環境や
+  テキストとして差分を読みたいレビュアー向け)
+
+### Changed
+
+- `PostDesignDiffCommentUseCase`が`svg_renderer`/`asset_port`を新たに注入
+  される。沈黙する場合(変更なし かつ 警告なし)はSVGの生成・公開自体も
+  行わない(不要なコミットをオーファンブランチに積み上げない)
+- GitHub Actionワークフローの権限を`contents: read`→`contents: write`に変更
+  (design-diff-assetsブランチへのpushに必要な最小権限。フォークPRは既存の
+  if条件で引き続きスキップされる)
 
 ### Known Limitations(追加)
 
@@ -57,11 +79,10 @@ issueで確認済み)、**design-diff自身が直接SVGを生成するネイテ�
   場合の上位N件表示+省略件数の要約」というサイズ制御がまだ無い。件数が非常に
   多いPRでは図が縦に長くなり続ける
 
-### 未完了(次のフェーズ)
-
-- GitHub PRコメントへのSVG埋め込み(生成したSVGを専用ブランチにコミットし、
-  raw URL経由で`<img>`参照する方式。従来のMermaidブロックは`<details>`内の
-  フォールバックとして残す)。実装中
+実際にPRを作成し、`gh`での手動実行ではなく本物のpull_requestイベント経由で
+本ワークフローが自動実行され、SVGが`design-diff-assets`ブランチにコミットされ、
+コメントの`<img>`がGitHub上で実際に描画されることを確認済み。詳細は
+[docs/design/architecture.md](./docs/design/architecture.md) §7.3。
 
 ## [0.2.1] - 2026-08-22
 

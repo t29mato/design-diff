@@ -1,7 +1,7 @@
-"""PostDesignDiffCommentUseCase のテスト。architecture.md §2.1。
+"""PostDesignDiffCommentUseCase のテスト。architecture.md §2.1, §7.3。
 
-ComputeDesignDiffUseCaseの結果を使って、変更があるときだけCommentPortにupsertする
-(沈黙原則。HQ指示: has_changesがfalseなら投稿しない)。
+ComputeDesignDiffUseCaseの結果を使って、変更(または警告)があるときだけ
+SVGを生成・公開し、CommentPortにupsertする(沈黙原則。HQ指示)。
 """
 
 from __future__ import annotations
@@ -30,6 +30,40 @@ class FakeCommentPort:
         self.upserts.append((pr, body))
 
 
+class FakeSvgRenderer:
+    """RendererPortを構造的に満たすフェイク。渡されたdiffを記録するだけ。"""
+
+    def __init__(self, svg_text: str = "<svg>fake</svg>"):
+        self._svg_text = svg_text
+        self.rendered_diffs: list = []
+
+    def render(self, diff, *, mermaid=None, meta=None) -> str:
+        self.rendered_diffs.append(diff)
+        return self._svg_text
+
+
+class FakeAssetPort:
+    """AssetPortを構造的に満たすフェイク。publish呼び出しを記録し、固定URLを返す。"""
+
+    def __init__(self, url: str = "https://raw.githubusercontent.com/owner/repo/abc123/assets/pr-42.svg"):
+        self._url = url
+        self.published: list[tuple[str, bytes, str]] = []
+
+    def publish(self, path: str, content: bytes, message: str) -> str:
+        self.published.append((path, content, message))
+        return self._url
+
+
+def make_use_case(
+    compute_use_case, comment_port=None, svg_renderer=None, asset_port=None
+) -> tuple[PostDesignDiffCommentUseCase, FakeCommentPort, FakeSvgRenderer, FakeAssetPort]:
+    comment_port = comment_port or FakeCommentPort()
+    svg_renderer = svg_renderer or FakeSvgRenderer()
+    asset_port = asset_port or FakeAssetPort()
+    use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port, svg_renderer, asset_port)
+    return use_case, comment_port, svg_renderer, asset_port
+
+
 def result_with_changes() -> DesignDiffResult:
     added = ClassIR(fqn="pkg.Battery", name="Battery")
     return DesignDiffResult(
@@ -49,9 +83,7 @@ def result_without_changes() -> DesignDiffResult:
 
 def result_without_changes_but_with_warnings() -> DesignDiffResult:
     return DesignDiffResult(
-        diff=SnapshotDiff(
-            classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",)
-        ),
+        diff=SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",)),
         mermaid="classDiagram",
         json_payload='{"has_changes": false, "warnings": ["pkg.broken"]}',
     )
@@ -59,34 +91,60 @@ def result_without_changes_but_with_warnings() -> DesignDiffResult:
 
 class TestPostDesignDiffCommentUseCase:
     def test_posts_a_comment_when_there_are_changes(self):
-        compute_use_case = FakeComputeUseCase(result_with_changes())
-        comment_port = FakeCommentPort()
-        use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port)
+        use_case, comment_port, _, _ = make_use_case(FakeComputeUseCase(result_with_changes()))
 
         use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
 
         assert len(comment_port.upserts) == 1
         pr, body = comment_port.upserts[0]
         assert pr == 42
-        assert "classDiagram" in body
-        assert "pkg_Battery" in body
+
+    def test_comment_body_embeds_the_published_image_url_and_mermaid_fallback(self):
+        use_case, comment_port, _, asset_port = make_use_case(
+            FakeComputeUseCase(result_with_changes()),
+            asset_port=FakeAssetPort(url="https://raw.githubusercontent.com/owner/repo/deadbeef/assets/pr-42.svg"),
+        )
+
+        use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
+
+        _, body = comment_port.upserts[0]
+        assert '<img src="https://raw.githubusercontent.com/owner/repo/deadbeef/assets/pr-42.svg"' in body
+        assert "<details>" in body
+        assert "pkg_Battery" in body  # Mermaidフォールバックの中身
+
+    def test_svg_is_rendered_from_the_computed_diff(self):
+        result = result_with_changes()
+        use_case, _, svg_renderer, _ = make_use_case(FakeComputeUseCase(result))
+
+        use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
+
+        assert svg_renderer.rendered_diffs == [result.diff]
+
+    def test_svg_is_published_with_a_path_derived_from_the_pr_number(self):
+        use_case, _, _, asset_port = make_use_case(FakeComputeUseCase(result_with_changes()))
+
+        use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
+
+        assert len(asset_port.published) == 1
+        path, content, message = asset_port.published[0]
+        assert path == "assets/pr-42.svg"
+        assert content == b"<svg>fake</svg>"
 
     def test_does_not_post_when_there_are_no_changes_silence_principle(self):
-        compute_use_case = FakeComputeUseCase(result_without_changes())
-        comment_port = FakeCommentPort()
-        use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port)
+        use_case, comment_port, _, asset_port = make_use_case(FakeComputeUseCase(result_without_changes()))
 
         use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
 
         assert comment_port.upserts == []
+        assert asset_port.published == []  # 沈黙する場合はSVGの公開自体も行わない
 
     def test_posts_a_comment_when_there_are_no_changes_but_there_are_warnings(self):
         """沈黙原則の条件変更(HQ指摘): 『変更なし かつ 警告なし』のときだけ
         沈黙する。警告(部分解析)がある場合は、変更が無くても投稿する。
         """
-        compute_use_case = FakeComputeUseCase(result_without_changes_but_with_warnings())
-        comment_port = FakeCommentPort()
-        use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port)
+        use_case, comment_port, _, _ = make_use_case(
+            FakeComputeUseCase(result_without_changes_but_with_warnings())
+        )
 
         use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
 
@@ -94,17 +152,14 @@ class TestPostDesignDiffCommentUseCase:
 
     def test_passes_include_boilerplate_through_to_compute_use_case(self):
         compute_use_case = FakeComputeUseCase(result_without_changes())
-        comment_port = FakeCommentPort()
-        use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port)
+        use_case, _, _, _ = make_use_case(compute_use_case)
 
         use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg", include_boilerplate=True)
 
         assert compute_use_case.calls == [("main", "feature", "pkg", True)]
 
     def test_returns_the_computed_result_regardless_of_whether_it_posted(self):
-        compute_use_case = FakeComputeUseCase(result_with_changes())
-        comment_port = FakeCommentPort()
-        use_case = PostDesignDiffCommentUseCase(compute_use_case, comment_port)
+        use_case, _, _, _ = make_use_case(FakeComputeUseCase(result_with_changes()))
 
         result = use_case.execute(pr=42, base_ref="main", head_ref="feature", package="pkg")
 
@@ -148,8 +203,7 @@ class TestPostDesignDiffCommentUseCase:
             mermaid_renderer=MermaidRenderer(),
             json_renderer=JsonRenderer(),
         )
-        comment_port = FakeCommentPort()
-        use_case = PostDesignDiffCommentUseCase(real_compute_use_case, comment_port)
+        use_case, comment_port, _, _ = make_use_case(real_compute_use_case)
 
         use_case.execute(pr=7, base_ref="main", head_ref="feature", package="pkg")
 

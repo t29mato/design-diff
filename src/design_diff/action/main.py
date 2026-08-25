@@ -1,7 +1,10 @@
-"""GitHub Actionエントリポイント。architecture.md §2, §2.1, §8, §9。
+"""GitHub Actionエントリポイント。architecture.md §2, §2.1, §7.3, §8, §9。
 
-PRイベントでbase...headの設計diffを計算し、Mermaidブロックをコメントとして
-upsertする(沈黙原則: has_changesがfalseかつwarningsが空なら投稿しない。実体は
+PRイベントでbase...headの設計diffを計算し、GitHub diff風のネイティブSVG
+(`GitHubStyleSvgRenderer`)をdesign-diff-assetsオーファンブランチへコミット
+(`GitOrphanBranchAssetPublisher`)して、そのraw URLを`<img>`としてコメントに
+埋め込む。従来のMermaidブロックは`<details>`内のフォールバックとして残す
+(沈黙原則: has_changesがfalseかつwarningsが空なら投稿しない。実体は
 application.use_cases.PostDesignDiffCommentUseCase)。
 引数解析とアダプタの注入だけを行う薄い殻(cli/main.pyと同じ方針。HQ指摘2)。
 
@@ -21,7 +24,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError, Py2pumlExtractor
+from design_diff.adapters.github.asset_publisher import GitOrphanBranchAssetPublisher
 from design_diff.adapters.github.comment_poster import GitHubCommentPoster
+from design_diff.adapters.rendering.github_style_svg_renderer import GitHubStyleSvgRenderer
 from design_diff.adapters.rendering.json_renderer import JsonRenderer
 from design_diff.adapters.rendering.mermaid_renderer import MermaidRenderer
 from design_diff.adapters.vcs.git_worktree import GitWorktreeVcs
@@ -57,7 +62,9 @@ def _default_use_case_factory(repo_path: Path | None, repo_slug: str) -> PostDes
         json_renderer=JsonRenderer(),
     )
     comment_port = GitHubCommentPoster(repo=repo_slug)
-    return PostDesignDiffCommentUseCase(compute_use_case, comment_port)
+    svg_renderer = GitHubStyleSvgRenderer()
+    asset_port = GitOrphanBranchAssetPublisher(repo_path=repo_path, repo_slug=repo_slug)
+    return PostDesignDiffCommentUseCase(compute_use_case, comment_port, svg_renderer, asset_port)
 
 
 def _build_parser() -> argparse.ArgumentParser:

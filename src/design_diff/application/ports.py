@@ -76,3 +76,18 @@ class CommentPort(Protocol):
     """PRへのコメント投稿(作成 or 既存コメントの更新)を行う。"""
 
     def upsert(self, pr: int, body: str) -> None: ...
+
+
+class AssetPort(Protocol):
+    """diffの可視化に使うバイナリ/テキストアセット(SVG等)を永続化し、参照可能な
+    URLを返す。
+
+    HQ #36/#38の仕上げ: GitHub PRコメントに生の`<svg>`タグ・data URIの`<img>`は
+    サニタイザーに除去されてしまう(architecture.md §7)ため、SVGを永続化先
+    (design-diff-assetsオーファンブランチ等)へコミットし、そのraw URLを
+    コメント本文の`<img src="...">`から参照する、という構成を取る。
+    """
+
+    def publish(self, path: str, content: bytes, message: str) -> str:
+        """contentをpathとして永続化し、参照可能なURLを返す。"""
+        ...

@@ -4,9 +4,12 @@
 
 from pathlib import Path
 
-from design_diff.action.main import ActionConfig, main, parse_config
+from design_diff.action.main import ActionConfig, _default_use_case_factory, main, parse_config
 from design_diff.adapters.extraction.py2puml_extractor import Py2pumlExtractionError
+from design_diff.adapters.github.asset_publisher import GitOrphanBranchAssetPublisher
+from design_diff.adapters.rendering.github_style_svg_renderer import GitHubStyleSvgRenderer
 from design_diff.application.use_cases.compute_design_diff import DesignDiffResult
+from design_diff.application.use_cases.post_design_diff_comment import PostDesignDiffCommentUseCase
 from design_diff.domain.diff import ClassDiff, RelationDiff, SnapshotDiff
 from design_diff.domain.model import ClassIR
 
@@ -125,6 +128,20 @@ class TestActionMain:
         captured = capsys.readouterr()
         assert exit_code == 1
         assert "解析中にエラーが発生しました" in captured.err
+
+
+class TestDefaultUseCaseFactory:
+    """HQ #36/#38の仕上げ: 既定のcomposition rootが、SVG生成+アセット公開の
+    両アダプタを正しく配線していること(内部の依存関係の型を検証する)。
+    """
+
+    def test_wires_svg_renderer_and_asset_publisher_into_the_use_case(self):
+        use_case = _default_use_case_factory(Path("/some/repo"), "owner/repo")
+
+        assert isinstance(use_case, PostDesignDiffCommentUseCase)
+        assert isinstance(use_case._svg_renderer, GitHubStyleSvgRenderer)
+        assert isinstance(use_case._asset_port, GitOrphanBranchAssetPublisher)
+        assert use_case._asset_port._repo_slug == "owner/repo"
 
 
 class TestParseConfig:

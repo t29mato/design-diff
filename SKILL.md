@@ -11,10 +11,10 @@ renders a GitHub-diff-style picture of what changed at the class level
 shrunk), embedded as an image in the PR comment. This skill wires that up in
 the user's current repository.
 
-> This is a mirror of the canonical `/SKILL.md` at design-diff's repository
-> root (kept byte-identical; edit that one and copy down). The root copy is
-> what `npx skills add t29mato/design-diff` fetches; this nested copy makes
-> the skill directly usable when working in design-diff's own repository.
+> Installed this file via `npx skills add t29mato/design-diff`? You're already
+> set up — just invoke the skill. This is the canonical copy; a byte-identical
+> mirror lives at `.claude/skills/enable-design-diff/SKILL.md` in design-diff's
+> own repo for direct use there.
 
 Follow these steps. Do not skip the confirmation steps — pushing a workflow
 file and committing to it is a real, outward-facing change.

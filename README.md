@@ -61,7 +61,7 @@ Returns a self-contained JSON document — added/removed/modified classes, membe
 
 ## How it works
 
-design-diff checks out both refs into temporary worktrees, imports the package in each snapshot (in isolated subprocesses), extracts the class structure — inheritance and composition from type annotations, resolved with `typing.get_type_hints()` — and diffs the two structures. Rendering is a pure function of that diff.
+design-diff checks out both refs into temporary worktrees, imports the package in each snapshot (in isolated subprocesses), extracts the class structure — inheritance and composition from type annotations, resolved with `typing.get_type_hints()` — and diffs the two structures. Rendering is a pure function of that diff. Unlike exploratory, presentation-oriented architecture visualizers, design-diff is deterministic, runs as a CI-enforced check on every pull request, and involves no LLM — the diagram is a pure function of two code snapshots, not a generated summary.
 
 ## Requirements & limitations
 

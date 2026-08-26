@@ -1,0 +1,50 @@
+name: design-diff demo
+
+# HQ #49指示: README冒頭で「実際に触れるサンプルPR」を示すための、独立した
+# デモ専用ワークフロー。demo_shop/(design_diffツール自体からは参照されない
+# 独立したfixtureパッケージ)を対象に design-diff を実行する。
+#
+# メインの design-diff-comment.yml は design_diff パッケージ自身を解析する
+# ためのもので、このデモ用途とは意図的に分離している(paths フィルタで、
+# demo_shop/ を触るPRでしか動かないようにする)。
+#
+# セキュリティ方針は design-diff-comment.yml と同一(architecture.md §5.5, §9):
+# - pull_request_target は使わない
+# - フォークPRからのイベントではジョブ自体をスキップする
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "demo_shop/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  demo-comment:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Post design-diff demo comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run python -m design_diff.action.main \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            --package demo_shop \
+            --pr "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}"

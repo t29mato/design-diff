@@ -44,7 +44,7 @@
 
 - [README](https://raw.githubusercontent.com/t29mato/design-diff/main/README.md): what it does, quick start (Action and CLI), how it works, requirements & limitations
 - [AGENTS.md](https://raw.githubusercontent.com/t29mato/design-diff/main/AGENTS.md): step-by-step runbook for an agent adopting design-diff into another repository, plus conventions for agents contributing to design-diff's own source
-- [.claude/skills/enable-design-diff/SKILL.md](https://raw.githubusercontent.com/t29mato/design-diff/main/.claude/skills/enable-design-diff/SKILL.md): a Claude Code Skill that automates adoption (detects the package, writes the workflow file). Copy the `enable-design-diff` directory into any repository's `.claude/skills/` to use it there.
+- [SKILL.md](https://raw.githubusercontent.com/t29mato/design-diff/main/SKILL.md): an agent skill that automates adoption (detects the package, writes the workflow file). Install with `npx skills add t29mato/design-diff` (any agent supported by [vercel-labs/skills](https://github.com/vercel-labs/skills)), or copy `.claude/skills/enable-design-diff/` into a repository's own `.claude/skills/` for direct Claude Code use.
 - [CHANGELOG.md](https://raw.githubusercontent.com/t29mato/design-diff/main/CHANGELOG.md): version history
 - [docs/design/architecture.md](https://raw.githubusercontent.com/t29mato/design-diff/main/docs/design/architecture.md): clean-architecture layering, domain model, diff algorithm, rendering policy, CI/security decisions and their rationale
 - [docs/examples/](https://github.com/t29mato/design-diff/tree/main/docs/examples): real CLI output examples (unedited), including the JSON schema in practice
@@ -73,6 +73,8 @@
   for the full setup runbook: confirm the target is a Python project, determine
   the `--package` name, optionally verify locally, add the workflow file, and
   open a PR to confirm the comment appears.
-- If you are Claude Code, the `.claude/skills/enable-design-diff/SKILL.md`
-  skill automates most of this — copy that directory into the target
-  repository's `.claude/skills/` and invoke it.
+- Fastest path: `npx skills add t29mato/design-diff` installs the
+  `enable-design-diff` skill into any supported agent (Claude Code, Cursor,
+  opencode, etc. — see [vercel-labs/skills](https://github.com/vercel-labs/skills)),
+  then invoke it to detect the package and write the workflow file
+  automatically.

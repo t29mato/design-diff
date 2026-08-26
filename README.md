@@ -4,6 +4,9 @@
 
 ![design-diff output: a class diagram where added members are green rows with a + gutter, removed members are red rows with strikethrough, and a new dependency is drawn as a labeled green edge](./docs/images/shop-discount-codes.svg)
 
+![The same diagram as it actually renders inside a live GitHub pull request comment](./docs/images/pr-comment-live-demo.png)
+*This is a real PR comment, not a mockup — click through: [sample PR #8](https://github.com/t29mato/design-diff/pull/8).*
+
 A 500-line diff tells you *how much* changed. design-diff tells you *what* changed: which classes appeared or disappeared, which properties and methods were added or removed inside each class, and which dependencies grew between them. Added members are green rows with a `+` gutter, removed members are red rows with strikethrough — the same visual language as the code diff you already read every day.
 
 ## Quick start (GitHub Action)

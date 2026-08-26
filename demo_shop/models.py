@@ -9,30 +9,31 @@ class Category:
 
 
 @dataclass
+class DiscountCode:
+    code: str
+    percent_off: float
+
+
+@dataclass
 class Product:
     name: str
     price: float
     category: Category
 
-    def apply_discount(self, percent: float) -> float:
+    def apply_discount(self, percent: float, code: DiscountCode | None) -> float:
         return self.price * (1 - percent / 100)
-
-
-@dataclass
-class LegacyCouponBanner:
-    text: str
 
 
 class Cart:
     def __init__(self):
         self.items: list[Product] = []
-        self.legacy_notes: str = ""
+        self.discount_code: DiscountCode | None = None
 
     def add(self, product: Product) -> None:
         self.items.append(product)
 
-    def send_legacy_receipt(self) -> None:
-        pass
+    def apply_code(self, code: DiscountCode) -> None:
+        self.discount_code = code
 
     def total(self) -> float:
         return sum(p.price for p in self.items)

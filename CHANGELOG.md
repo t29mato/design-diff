@@ -31,6 +31,29 @@ LLMO標準の整備(AIエージェントからの発見可能性・利用可能�
   内容が同一であることを確認済み(README側のみファイルパスのコメント行が
   付いている、という差のみ)
 
+競合調査(HQ #49。archify等のエージェントスキルが市場を証明)を受けた3タスク。
+
+### Added
+
+- ルートに正規の`SKILL.md`を新規作成し、`npx skills add t29mato/design-diff`
+  ([vercel-labs/skills](https://github.com/vercel-labs/skills))で単一スキル
+  リポジトリとして発見できるようにした(最小構成。HQ方針: 作り込まない)。
+  既存の`.claude/skills/enable-design-diff/SKILL.md`は内容を維持し、両者が
+  同期していることを明記(ルートが正、ネストされた方はdesign-diff自身の
+  リポジトリでの直接利用向けミラー)。llms.txt/AGENTS.mdに`npx skills add`を追記
+- README冒頭のヒーロー画像の直下に、実際のGitHub PR上でのコメント表示を撮った
+  スクリーンショット(`docs/images/pr-comment-live-demo.png`)と、実際に触れる
+  サンプルPR([#8](https://github.com/t29mato/design-diff/pull/8)。意図的に
+  マージ・クローズせず開いたままにする)へのリンクを追加した。この実演のために
+  `demo_shop/`(`design_diff`ツール自体からは参照されない独立したfixture
+  パッケージ)と専用ワークフロー(`.github/workflows/design-diff-demo.yml`、
+  `demo_shop/**`へのpathsフィルタ付き)を新設した
+- READMEの`How it works`末尾に、探索・プレゼン系ツールとの違い(決定論的・
+  CI強制・LLM不使用)を英語1文で追加した
+
+README本文の変更は上記の1文追加+画像/リンクの挿入のみ(Fable承認済みの
+他の文言は変更していない)。
+
 ## [0.3.0] - 2026-08-25
 
 **目玉**: GitHub diff風のネイティブSVGレンダラーを実装し、GitHub PRコメントへの

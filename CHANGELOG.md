@@ -5,6 +5,32 @@
 
 ## [Unreleased]
 
+LLMO標準の整備(AIエージェントからの発見可能性・利用可能性向上)。コードの
+振る舞いは変更していない(ドキュメント・Claude Code Skillの追加のみ)。
+
+### Added
+
+- `llms.txt`を、新しい英語READMEの内容(SVGが既定の画像形式であること等)に
+  合わせて全面的に更新。Capabilities節・「Notes for AI agents adopting this
+  tool」節を新設
+- `AGENTS.md`に「design-diffを他のリポジトリに導入する」ランブックを新設
+  (対象がPythonプロジェクトか確認→`--package`名の特定→ローカル確認(任意)→
+  ワークフローファイル作成→push→PRで動作確認、というエージェントが自力で
+  辿れる手順)。従来の「design-diff自身への貢献」向け内容はPart 2として存置
+- Claude Code用Skill `.claude/skills/enable-design-diff/SKILL.md`を新規作成。
+  「このリポジトリでdesign-diffを有効化する」スキルで、対象パッケージ名の
+  検出からワークフローファイル生成までを自動化する。他リポジトリで使うには
+  `enable-design-diff`ディレクトリごとそのリポジトリの`.claude/skills/`へ
+  コピーする
+
+### Notes
+
+- READMEの英語リライト(Fable実施、コミット`7b31cde`)を取り込んだ上での
+  作業。README本文はこのタスクでは変更していない
+- README・AGENTS.md・SKILL.mdのGitHub Actionsワークフローの例(yaml)は
+  内容が同一であることを確認済み(README側のみファイルパスのコメント行が
+  付いている、という差のみ)
+
 ## [0.3.0] - 2026-08-25
 
 **目玉**: GitHub diff風のネイティブSVGレンダラーを実装し、GitHub PRコメントへの

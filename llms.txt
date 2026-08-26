@@ -1,19 +1,50 @@
 # design-diff
 
-> design-diff compares two Python code snapshots (base_ref, head_ref) and outputs
-> a class-level structure diff — added/removed/modified classes, inheritance,
-> composition dependencies — as a GitHub-diff-style SVG (added/removed/changed
-> members shown as colored diff lines, `--format svg`, the default for images),
-> a Mermaid classDiagram, and machine-readable JSON.
-> Install: `uv add design-diff` (or `pip install design-diff`). Run:
-> `design-diff diff <base_ref> <head_ref> --package <pkg> --format svg|mermaid|json`.
+> design-diff shows what a pull request does to a Python codebase's architecture:
+> which classes were added, removed, or modified; which properties and methods
+> changed inside each class; and which dependencies (inheritance, composition)
+> grew or shrank between classes. Output is a GitHub-diff-style picture (a
+> self-contained SVG, no external dependencies) embedded in the PR comment, or
+> machine-readable JSON for AI reviewers.
+> Install: `uv add design-diff` (or `pip install design-diff`).
+> CLI: `design-diff diff <base_ref> <head_ref> --package <pkg> --format svg|json|mermaid`
+> (`svg` is the default image format; `json` is for programmatic/LLM consumption).
+> GitHub Action: add one workflow file and every same-repo pull request gets an
+> automatic, upserted comment (see "Quick start (GitHub Action)" in README).
 > Requires type annotations to detect dependencies. Executes the analyzed code
 > via import — only run against trusted (same-repo) code.
 
+## Capabilities
+
+- Diffs two git refs (branches, tags, or commits) and detects: added/removed/
+  modified classes; added/removed/changed properties and methods within each
+  class; added/removed inheritance and composition edges between classes.
+- `--format svg` (default): a self-contained, GitHub-diff-style SVG rendered
+  directly by design-diff (no Mermaid, no external renderer, no network
+  fetch). Added members render as green rows with a `+` gutter, removed
+  members as red rows with strikethrough, changed members as a yellow
+  "old signature → new signature" row; added/removed edges as labeled
+  green/red-dashed lines.
+- `--format json`: a self-contained payload — `summary`, per-class
+  `attributes`/`methods` diffs, `relations`, a `mermaid` field with an
+  equivalent classDiagram rendering, and a `warnings` array. Designed to be
+  dropped straight into an LLM reviewer's context.
+- `--format mermaid`: plain Mermaid `classDiagram` text (also embedded as a
+  `<details>` fallback inside the GitHub Action's PR comment).
+- GitHub Action posts one comment per PR and updates it in place on every
+  push (no notification floods). It commits the SVG to a `design-diff-assets`
+  branch and embeds it via a `raw.githubusercontent.com` URL, because GitHub
+  sanitizes inline `<svg>`/data-URI `<img>` tags out of comment bodies.
+- Silent by default: no comment when there is no structural change **and** no
+  analysis warning. If a submodule failed to import, a comment is still
+  posted with a warning, so "no changes" is never claimed for a partial
+  analysis.
+
 ## Docs
 
-- [README](https://raw.githubusercontent.com/t29mato/design-diff/main/README.md): usage, output format, GitHub Action, licensing, limitations & security
-- [AGENTS.md](https://raw.githubusercontent.com/t29mato/design-diff/main/AGENTS.md): setup/build/test/lint commands and conventions for coding agents contributing to this repo
+- [README](https://raw.githubusercontent.com/t29mato/design-diff/main/README.md): what it does, quick start (Action and CLI), how it works, requirements & limitations
+- [AGENTS.md](https://raw.githubusercontent.com/t29mato/design-diff/main/AGENTS.md): step-by-step runbook for an agent adopting design-diff into another repository, plus conventions for agents contributing to design-diff's own source
+- [.claude/skills/enable-design-diff/SKILL.md](https://raw.githubusercontent.com/t29mato/design-diff/main/.claude/skills/enable-design-diff/SKILL.md): a Claude Code Skill that automates adoption (detects the package, writes the workflow file). Copy the `enable-design-diff` directory into any repository's `.claude/skills/` to use it there.
 - [CHANGELOG.md](https://raw.githubusercontent.com/t29mato/design-diff/main/CHANGELOG.md): version history
 - [docs/design/architecture.md](https://raw.githubusercontent.com/t29mato/design-diff/main/docs/design/architecture.md): clean-architecture layering, domain model, diff algorithm, rendering policy, CI/security decisions and their rationale
 - [docs/examples/](https://github.com/t29mato/design-diff/tree/main/docs/examples): real CLI output examples (unedited), including the JSON schema in practice
@@ -21,7 +52,7 @@
 ## Notes for AI reviewers
 
 - `--format json` produces a self-contained JSON payload with a `mermaid` field
-  containing the already-rendered diagram, so a reviewer can reproduce a
+  containing an equivalent classDiagram rendering, so a reviewer can reproduce a
   human-readable diagram from the JSON alone. It also has a `warnings` array
   listing any submodule that failed to import during extraction (empty means
   the analysis covered the whole package).
@@ -30,8 +61,18 @@
   does the tool stay silent (no PR comment is posted). If `warnings` is
   non-empty, a comment is posted even with `has_changes: false`, so reviewers
   know the diff may be incomplete.
-- The GitHub Action embeds the SVG as an `<img>` in the PR comment (committed
-  to an orphan `design-diff-assets` branch and referenced via a
-  `raw.githubusercontent.com` URL, since GitHub sanitizes inline `<svg>`/data-URI
-  `<img>` tags out of comments); the Mermaid block is kept as a `<details>`
-  fallback in the same comment.
+- The GitHub Action embeds the rendered SVG as an `<img>` in the PR comment
+  (committed to an orphan `design-diff-assets` branch and referenced via a
+  `raw.githubusercontent.com` URL, with the commit SHA rather than the branch
+  name so the URL never serves stale cached content); the Mermaid block is
+  kept as a `<details>` fallback in the same comment.
+
+## Notes for AI agents adopting this tool
+
+- See [AGENTS.md](https://raw.githubusercontent.com/t29mato/design-diff/main/AGENTS.md)
+  for the full setup runbook: confirm the target is a Python project, determine
+  the `--package` name, optionally verify locally, add the workflow file, and
+  open a PR to confirm the comment appears.
+- If you are Claude Code, the `.claude/skills/enable-design-diff/SKILL.md`
+  skill automates most of this — copy that directory into the target
+  repository's `.claude/skills/` and invoke it.

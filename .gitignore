@@ -8,6 +8,11 @@ __pycache__/
 .coverage
 coverage.xml
 .design-diff-worktrees/
-.claude/
+.claude/*
+# .claude/skills/ はリポジトリの一部として配布する(Claude Code用Skill。
+# 「このリポジトリでdesign-diffを有効化する」スキルを他リポジトリへ配布
+# するための正規の置き場所。AGENTS.md/llms.txt参照)。それ以外の.claude/配下
+# (ローカルのセッション設定・権限設定等)は引き続き無視する。
+!.claude/skills/
 .DS_Store
 dist/

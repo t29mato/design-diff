@@ -1,74 +1,199 @@
 # AGENTS.md
 
-design-diff にコード変更を加えるAIコーディングエージェント向けの手順。
-プロジェクトの背景・設計方針は [CLAUDE.md](./CLAUDE.md) と
-[docs/design/architecture.md](./docs/design/architecture.md) を参照。
+design-diff — a class-level architecture diff for Python, rendered as a
+GitHub-diff-style SVG in the PR comment. This file has two parts:
 
-## セットアップ
+1. **Adopting design-diff into another repository** — for an agent whose task
+   is "add design-diff to this repo" / "set up architecture-diff PR comments".
+2. **Contributing to design-diff itself** — for an agent modifying this
+   repository's own source.
+
+---
+
+## Part 1: Adopting design-diff into another repository
+
+Follow these steps in order. They take you from nothing to a working PR
+comment.
+
+### 1. Confirm this is a fit
+
+design-diff analyzes Python packages and detects inheritance/composition
+dependencies from type annotations. Unannotated code still diffs classes and
+members, but dependency edges won't appear. If the target repo isn't Python,
+stop here and say so.
+
+### 2. Determine the `--package` name
+
+This is the importable top-level package name to analyze, not the PyPI
+distribution name. Look for it, in order:
+
+- `[project].name` in `pyproject.toml` (normalize dashes to underscores)
+- a `src/<name>/__init__.py` or top-level `<name>/__init__.py`
+- if still ambiguous (monorepo, multiple packages), ask the user
+
+### 3. (Optional but recommended) Verify locally first
+
+```bash
+uv add design-diff   # or: pip install design-diff, if the repo doesn't use uv
+design-diff diff <an-earlier-ref> HEAD --package <package_name> --format svg > /tmp/design-diff-check.svg
+```
+
+Open the SVG and sanity-check the package name is right and the diagram looks
+reasonable, before wiring up the Action. Skip this step if there's no earlier
+ref worth diffing against yet.
+
+### 4. Add the GitHub Actions workflow
+
+Create `.github/workflows/design-diff-comment.yml` with this exact content
+(this is the same template shown in design-diff's own README "Quick start
+(GitHub Action)" section — keep them in sync if you change one), replacing
+`your_package_name` with the value from step 2:
+
+```yaml
+name: design-diff
+on:
+  pull_request:
+permissions:
+  contents: write        # publishes the SVG to an assets branch
+  pull-requests: write   # posts / updates the PR comment
+jobs:
+  design-diff:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run python -m design_diff.action.main \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            --package your_package_name \
+            --pr "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}"
+```
+
+If the target repo doesn't manage Python dependencies with `uv`, adapt the
+`uv sync`/`uv run` steps to however it does (e.g. `pip install -e .` then
+`pip install design-diff` then run `python -m design_diff.action.main ...`
+directly). Either way, make sure `design-diff` itself is installed in the job
+(add it to the repo's dependencies, or install it as a separate step) — the
+workflow above assumes `uv sync` already resolves it because it's listed in
+that repo's `pyproject.toml`/`uv.lock`.
+
+### 5. Commit and push
+
+Commit the workflow file (and any dependency addition) following the normal
+commit/push rules for that session — ask for confirmation before pushing,
+same as any other change.
+
+### 6. Confirm it works
+
+Open a pull request (any small code change touching the analyzed package) and
+confirm a comment appears with the rendered image on the first successful
+run. The comment updates in place on further pushes to the same PR (no
+notification floods) and stays silent when nothing structural changed.
+
+### Troubleshooting
+
+- **`ModuleNotFoundError` in the Action logs**: the analyzed package's own
+  runtime dependencies aren't installed in the job — this is not a
+  design-diff bug. Make sure the dependency-install step actually installs
+  the *analyzed* package's dependencies, not just design-diff's.
+- **No comment on PRs from forks**: intentional. The `if:` condition skips
+  fork PRs, because design-diff imports and executes the analyzed code —
+  only same-repo PRs are analyzed.
+- **Diagram shows no dependency edges**: the analyzed classes likely lack
+  type annotations on attributes / `__init__` parameters.
+
+### Automating this with Claude Code
+
+[.claude/skills/enable-design-diff/SKILL.md](./.claude/skills/enable-design-diff/SKILL.md)
+packages steps 2–4 above as a Claude Code Skill. Copy the
+`enable-design-diff` directory into the target repository's `.claude/skills/`
+to make it available there.
+
+---
+
+## Part 2: Contributing to design-diff itself
+
+Background and design rationale: [CLAUDE.md](./CLAUDE.md) and
+[docs/design/architecture.md](./docs/design/architecture.md).
+
+### Setup
 
 ```bash
 uv sync --dev
 ```
 
-`uv` (https://docs.astral.sh/uv/) を使う。`pip`/`poetry`/`requirements.txt` は使わない。
+Uses [uv](https://docs.astral.sh/uv/). No `pip`/`poetry`/`requirements.txt`.
 
-## ビルド・テスト・Lint
+### Build, test, lint
 
-push前に必ずこれを実行し、全ステップgreenであることを確認する:
+Run this before every push and make sure every step is green:
 
 ```bash
 ./scripts/ci.sh
 ```
 
-内訳(`.github/workflows/ci.yml` と同一の判定基準):
+Breakdown (same criteria as `.github/workflows/ci.yml`):
 
 ```bash
 uv run ruff check .                                                          # lint
-uv run lint-imports                                                          # レイヤー境界の強制
-uv run pytest --cov --cov-report=term-missing --cov-report=xml               # テスト+カバレッジ
-uv run coverage report --include="src/design_diff/domain/*" --fail-under=90  # ドメイン層カバレッジ90%ゲート
+uv run lint-imports                                                          # layer boundary enforcement
+uv run pytest --cov --cov-report=term-missing --cov-report=xml               # tests + coverage
+uv run coverage report --include="src/design_diff/domain/*" --fail-under=90  # domain-layer coverage gate
 ```
 
-クローン後に一度 `./scripts/install-hooks.sh` を実行すると、`git push` のたびに
-上記が自動実行される(pre-pushフック)。
+Run `./scripts/install-hooks.sh` once after cloning to make this run
+automatically as a pre-push hook.
 
-## コード規約
+### Code conventions
 
-- **クリーンアーキテクチャ**: `domain`(純粋なIR+diffアルゴリズム。py2puml/git/GitHub
-  APIに一切依存しない)→ `application`(Protocolベースのport + use case)→
-  `adapters`(py2puml抽出・git worktree・Mermaid/JSON/GitHub diff風ネイティブSVG
-  レンダリング・GitHubコメント投稿・design-diff-assetsブランチへのSVGアセット
-  公開)→ `cli`/`action`(composition root)。依存方向は
-  `cli|action → application → adapters → domain` のみ
-- **import-linterの4契約を緩めない**(`.importlinter`)。レイヤー違反でCIが落ちる
-  設計は意図的なもので、緩和にはメンテナの承認が必要
-- **TDD**: テスト先行。`domain`層のカバレッジ目標90%(CIのゲートで強制)
-- 型アノテーションは必須(design-diff自身がpy2puml経由で型アノテーションから
-  依存関係を抽出するツールであり、自分自身がその模範であるべきため)
+- **Clean architecture**: `domain` (pure IR + diff algorithm, zero dependency
+  on py2puml/git/GitHub APIs) → `application` (Protocol-based ports + use
+  cases) → `adapters` (py2puml extraction, git worktree, Mermaid/JSON/native
+  GitHub-diff-style SVG rendering, GitHub comment posting, SVG asset
+  publishing to the `design-diff-assets` branch) → `cli`/`action`
+  (composition roots). Dependencies flow one way only:
+  `cli|action → application → adapters → domain`.
+- **Don't loosen the 4 import-linter contracts** (`.importlinter`). CI
+  failing on a layer violation is intentional; loosening it needs maintainer
+  approval.
+- **TDD**: tests first. `domain` layer coverage target is 90% (enforced by a
+  CI gate).
+- Type annotations are required (design-diff itself extracts dependencies
+  from type annotations via py2puml, so it should be a model example of the
+  practice it promotes).
 
-## 設計変更の進め方
+### Design changes
 
-アーキテクチャに関わる変更・技術選定の変更は、実装着手前に
-`docs/design/` にクラス図レベルの設計(Mermaid classDiagram)と依存方向の説明を
-書くこと。スパイク・調査だけの場合は `docs/design/spikes/`(検証後に削除する
-前提)または `docs/design/investigations/`(恒久的な記録)に置く。
+Architecture or technology-choice changes need a class-level design
+(Mermaid classDiagram) and a dependency-direction rationale in
+`docs/design/` *before* implementation starts. Spikes/investigations only go
+in `docs/design/spikes/` (delete after verifying) or
+`docs/design/investigations/` (permanent record).
 
-## コミット・ブランチ
+### Commits & branches
 
-- mainへの直接コミット・pushは許可されている(小規模な初期段階のプロジェクトの
-  ため)。push前に `./scripts/ci.sh` がgreenであることを確認する
-- タグ・GitHub Release・PyPI公開・破壊的なCI設定緩和には、人間のメンテナの
-  承認が必要。エージェントが単独で実行してはならない
+- Direct commits/pushes to `main` are allowed (small early-stage project).
+  Confirm `./scripts/ci.sh` is green before pushing.
+- Tags, GitHub Releases, PyPI publishing, and loosening CI enforcement need
+  human maintainer approval. An agent must not do these unilaterally.
 
-## このツール自身の使い方(ドッグフーディング)
+### Dogfooding
 
-自分のPRに対してdesign-diffを掛けて、設計diffが読めるか確認すること:
+Run design-diff on your own PR to check the design diff itself reads well:
 
 ```bash
 uv run design-diff diff main <your-branch> --package design_diff --format mermaid
 ```
 
-画像として確認したい場合(GitHub diff風のネイティブSVG。PRコメントで実際に
-使われる形式)は `--format svg > diagram.svg` でファイルに出力してから開く。
+To see the image form actually used in PR comments (native GitHub-diff-style
+SVG), use `--format svg > diagram.svg` and open the file.
 
-出力例は [docs/examples/](./docs/examples/) を参照。
+See [docs/examples/](./docs/examples/) for real output examples.

@@ -5,8 +5,38 @@
 
 ## [Unreleased]
 
-LLMO標準の整備(AIエージェントからの発見可能性・利用可能性向上)。コードの
-振る舞いは変更していない(ドキュメント・Claude Code Skillの追加のみ)。
+LLMO標準の最終ピース: design-diffのdiff機能をMCP(Model Context Protocol)の
+stdioサーバーとしても公開した(HQ指示、2026-08-27)。
+
+### Added
+
+- **`design-diff-mcp`(新規コンソールスクリプト)**: `analyze_design_diff`と
+  いう1つのツール(`base_ref`/`head_ref`/`package`/任意`repo_path`/
+  `include_boilerplate` → `--format json`と同じ機械可読JSON)を公開する
+  MCP stdioサーバー
+- **`design_diff.mcp`(新しい最上位層、composition root)**: `cli`/`action`
+  と対等な最上位層として`.importlinter`の`layers`契約に追加。既存の
+  ユースケース・ポート・アダプタは無変更のまま、非破壊的な追加として実装した
+  (docs/design/architecture.md §12.3で事前に見込んでいた通り)
+- **`design_diff.adapters.mcp`(新しいアダプタパッケージ)**: 公式Model
+  Context Protocol Python SDK(`mcp`パッケージ)への依存をここに閉じ込める。
+  `adapters-independence`契約にも追加し、他のアダプタから独立させた。
+  `application`層をimportせず(構造的部分型のローカルProtocolで対応)、
+  他アダプタの具象例外もimportしない(`friendly_message`属性の有無を
+  duck typingで判定)、という既存アダプタと同じ設計判断を踏襲した
+- README(新設「MCP server」節)・AGENTS.md(新設「Part 2: Registering the
+  MCP server」)に、汎用`mcp.json`・Claude Code(`claude mcp add`)・
+  Claude Desktopそれぞれの登録手順を追記した
+
+### Verification
+
+- ユニットテスト(引数受け渡し・repo_pathの呼び出しごとの独立性・
+  エラーハンドリング)、composition rootのテスト(実アダプタの配線・
+  テストフックへの委譲)、実際のgit worktree・py2puml・MCP SDKを使った
+  E2Eテストを追加(220 passed。ドメイン層カバレッジ100%維持)
+- `uv run design-diff-mcp`を実際に起動し、エラーなくstdioで待ち受け続ける
+  ことを手動でも確認した
+- PyPI公開の承認とは独立に実装(公開はしていない)
 
 ### Added
 

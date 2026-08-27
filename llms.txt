@@ -9,6 +9,9 @@
 > Install: `uv add design-diff` (or `pip install design-diff`).
 > CLI: `design-diff diff <base_ref> <head_ref> --package <pkg> --format svg|json|mermaid`
 > (`svg` is the default image format; `json` is for programmatic/LLM consumption).
+> MCP: `design-diff-mcp` runs a stdio server exposing one tool,
+> `analyze_design_diff` (same args as the CLI → the same JSON), for agents that
+> can call MCP tools directly instead of shelling out.
 > GitHub Action: add one workflow file and every same-repo pull request gets an
 > automatic, upserted comment (see "Quick start (GitHub Action)" in README).
 > Requires type annotations to detect dependencies. Executes the analyzed code
@@ -39,6 +42,12 @@
   analysis warning. If a submodule failed to import, a comment is still
   posted with a warning, so "no changes" is never claimed for a partial
   analysis.
+- `design-diff-mcp`: an [MCP](https://modelcontextprotocol.io) stdio server
+  (console script, installed alongside the CLI) exposing one tool,
+  `analyze_design_diff(base_ref, head_ref, package, repo_path=None,
+  include_boilerplate=False) -> str` (the same JSON as `--format json`, as
+  text content). Register it with any MCP client; see AGENTS.md Part 2 for
+  client-specific steps (generic `mcp.json`, Claude Code, Claude Desktop).
 
 ## Docs
 

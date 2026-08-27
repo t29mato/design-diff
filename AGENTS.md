@@ -1,11 +1,13 @@
 # AGENTS.md
 
 design-diff — a class-level architecture diff for Python, rendered as a
-GitHub-diff-style SVG in the PR comment. This file has two parts:
+GitHub-diff-style SVG in the PR comment. This file has three parts:
 
 1. **Adopting design-diff into another repository** — for an agent whose task
    is "add design-diff to this repo" / "set up architecture-diff PR comments".
-2. **Contributing to design-diff itself** — for an agent modifying this
+2. **Registering the MCP server** — for an agent whose task is "give me/my
+   agent tool access to design-diff" via [MCP](https://modelcontextprotocol.io).
+3. **Contributing to design-diff itself** — for an agent modifying this
    repository's own source.
 
 ---
@@ -126,7 +128,69 @@ into the target repository's own `.claude/skills/`.
 
 ---
 
-## Part 2: Contributing to design-diff itself
+## Part 2: Registering the MCP server
+
+design-diff ships an [MCP](https://modelcontextprotocol.io) server exposing
+one tool, `analyze_design_diff` (`base_ref`, `head_ref`, `package`, optional
+`repo_path` and `include_boilerplate` → the same JSON as `--format json`). Use
+this when an agent should be able to request an architecture diff directly,
+without shelling out to the `design-diff` CLI.
+
+### 1. Install
+
+```bash
+uv add design-diff   # or: pip install design-diff
+```
+
+This provides a `design-diff-mcp` console script that runs the server over
+stdio (the default MCP transport for local tools).
+
+### 2. Register it with your MCP client
+
+The registration format depends on the client. In all cases, the command is
+`design-diff-mcp` (or `uv run design-diff-mcp` if design-diff is a project
+dependency rather than a global install), and the working directory should be
+the repository to analyze:
+
+**Generic `mcp.json` (most MCP clients):**
+
+```json
+{
+  "mcpServers": {
+    "design-diff": {
+      "command": "uv",
+      "args": ["run", "design-diff-mcp"],
+      "cwd": "/absolute/path/to/the/repo/to/analyze"
+    }
+  }
+}
+```
+
+**Claude Code:**
+
+```bash
+claude mcp add design-diff -- uv run design-diff-mcp
+```
+
+Run this from inside the repository you want to analyze (Claude Code passes
+its own working directory through as the server's `cwd`), or pass
+`repo_path` explicitly on each `analyze_design_diff` call instead.
+
+**Claude Desktop:** add the same `"design-diff": {...}` block shown above to
+`claude_desktop_config.json`'s `mcpServers` object, then restart the app.
+
+### 3. Verify
+
+Ask the connected agent to call `analyze_design_diff` with two refs in the
+target repository (e.g. `base_ref="main"`, `head_ref="HEAD"`, and the
+package name — see Part 1, step 2 for how to determine it) and confirm it
+returns the expected JSON. Do not run `design-diff-mcp` directly in a
+terminal to "test" it — it speaks JSON-RPC over stdio and will just sit
+there waiting for a client, not print anything.
+
+---
+
+## Part 3: Contributing to design-diff itself
 
 Background and design rationale: [CLAUDE.md](./CLAUDE.md) and
 [docs/design/architecture.md](./docs/design/architecture.md).

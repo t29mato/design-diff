@@ -30,6 +30,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "mcp>=2.1.1",
     "py2puml>=0.11.0",
 ]
 
@@ -41,6 +42,7 @@ Changelog = "https://github.com/t29mato/design-diff/blob/main/CHANGELOG.md"
 
 [project.scripts]
 design-diff = "design_diff.cli.main:main"
+design-diff-mcp = "design_diff.mcp.main:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

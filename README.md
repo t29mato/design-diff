@@ -62,6 +62,31 @@ design-diff diff main HEAD --package your_package_name --format json
 
 Returns a self-contained JSON document — added/removed/modified classes, member-level changes, dependency edges, and analysis warnings — designed to be dropped straight into an LLM reviewer's context.
 
+## MCP server (for agents and other MCP clients)
+
+design-diff also ships an [MCP](https://modelcontextprotocol.io) server exposing a single tool, `analyze_design_diff` (two git refs + a package name → the same JSON as `--format json`), so an agent can request an architecture diff directly instead of shelling out to the CLI.
+
+```bash
+uv add design-diff
+uv run design-diff-mcp   # stdio server; register it with your MCP client, don't run it standalone
+```
+
+Register it with your MCP client by pointing it at the `design-diff-mcp` command, for example in a generic `mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "design-diff": {
+      "command": "uv",
+      "args": ["run", "design-diff-mcp"],
+      "cwd": "/absolute/path/to/your/repo"
+    }
+  }
+}
+```
+
+`cwd` is the repository to analyze (`repo_path` can also be passed per-call as a tool argument to override it). See [AGENTS.md](./AGENTS.md) for client-specific registration steps (Claude Code, Claude Desktop, etc.).
+
 ## How it works
 
 design-diff checks out both refs into temporary worktrees, imports the package in each snapshot (in isolated subprocesses), extracts the class structure — inheritance and composition from type annotations, resolved with `typing.get_type_hints()` — and diffs the two structures. Rendering is a pure function of that diff. Unlike exploratory, presentation-oriented architecture visualizers, design-diff is deterministic, runs as a CI-enforced check on every pull request, and involves no LLM — the diagram is a pure function of two code snapshots, not a generated summary.

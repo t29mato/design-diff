@@ -969,11 +969,11 @@ MVP実装フェーズで以下をリポジトリ直下に作成する(CLAUDE.md�
 3ファイルとも実装フェーズの成果物であり、この設計フェーズでは着手しない
 (実装コードと同時に整備する。CLAUDE.mdの「実装着手前は設計のみ」方針に従う)。
 
-### 12.3 MCPサーバー化の要否 → **MVP対象外(post-MVP)。ただし判断根拠を明記**
+### 12.3 MCPサーバー化の要否 → **MVP対象外(post-MVP)と判断したが、post-MVPで実装済み**
 
-**判断: MCPサーバーの実装自体はMVPに含めない。ただしMVPのアーキテクチャは
-それを見据えた形にする(CLAUDE.mdの「将来のMCPサーバー化を見据えたインターフェース」
-という要求はこの設計で既に満たしている)。**
+**当初の判断(設計フェーズ): MCPサーバーの実装自体はMVPに含めない。ただし
+MVPのアーキテクチャはそれを見据えた形にする(CLAUDE.mdの「将来のMCPサーバー化を
+見据えたインターフェース」という要求はこの設計で既に満たしている)。**
 
 根拠:
 
@@ -981,16 +981,19 @@ MVP実装フェーズで以下をリポジトリ直下に作成する(CLAUDE.md�
   ペイロードとも無関係に、`(base_ref, head_ref, package) -> DesignDiffResult` という
   純粋な形で呼び出せる。`DesignDiffResult` は dataclass であり JSON化も容易(§6のスキーマと直結)。
 - MCPサーバーは技術的には「composition rootの3つ目の実装」(`cli/` `action/` に並ぶ
-  `mcp/design_diff_mcp_server.py`)にすぎない。既存のユースケース・ポート・アダプタには
-  一切変更を要しない**非破壊的な追加**として後から積める。
+  `mcp/`)にすぎない。既存のユースケース・ポート・アダプタには一切変更を要しない
+  **非破壊的な追加**として後から積める。
 - 逆に言えば、**今MCPサーバーを作らなくても、後で作る際にドメイン/application層の
   設計をやり直す必要はない**。つまり「MVPに入れない」という判断はアーキテクチャ上の
   手戻りリスクを生まない。
 - CLAUDE.mdのMVPスコープ(1: CLI, 2: GitHub Action, 3: LLMO標準装備)にMCPサーバーは
   明示的に列挙されていないため、スコープを勝手に広げない(要らぬ実装コストを避ける)。
 
-以上により、MCPサーバーの実装可否はMVP後の別タスクとして提案する。
-本設計フェーズでの結論はここまでとする。
+**実装(2026-08-27、HQ指示。LLMO標準の最終ピース)**: 上記の予測通り、既存の
+ユースケース・ポート・アダプタには一切変更を要しない非破壊的な追加として
+実装できた。`design_diff.mcp`(composition root)+ `design_diff.adapters.mcp`
+(アダプタ)という構成で、`cli/`・`action/`と対等な最上位層を追加しただけで
+済んでいる。詳細・実装で得た知見は§14参照。
 
 ---
 
@@ -1044,3 +1047,98 @@ self-hosted runnerを使えばGitHub Actionsの課金を避けつつワークフ
 この判断により、CI実行環境は「GitHub提供のホステッドrunner(public化済みで無料)」
 と「ローカルCI(手元での事前確認用)」の組み合わせに絞り、self-hosted runnerと
 いう第三の選択肢は意図的に排除した。
+
+---
+
+## 14. MCPサーバー化(HQ指示、2026-08-27、LLMO標準の最終ピース)
+
+design-diffのdiff機能を、CLI/GitHub Actionに加えて**Model Context Protocol
+(MCP)のstdioサーバー**としても公開する。ツールは1つだけ:
+`analyze_design_diff`(`base_ref`/`head_ref`/`package`/任意`repo_path`/
+`include_boilerplate` → `--format json`と同じ機械可読JSON)。
+
+### 14.1 レイヤー配置(composition rootとアダプタの分離)
+
+CLI/Actionと同じ構造上の悩みが生じた: MCPの「ツールハンドラを組み立てて
+公開する」処理は、公式SDK(`mcp`パッケージ)への依存を持つという意味では
+アダプタ的だが、`Py2pumlExtractor`/`GitWorktreeVcs`等**複数の具象アダプタを
+横断的に組み立てる**という意味ではcomposition root的でもある。CLI/Actionが
+既に採用している解決策と同じ形に倣った:
+
+- **`design_diff.mcp`(新しい最上位層、composition root)**: `cli`/`action`と
+  対等な最上位層としてimport-linterの`layers`契約に追加
+  (`design_diff.cli | design_diff.action | design_diff.mcp`)。`main.py`が
+  `_default_use_case_factory`で具象アダプタ(`Py2pumlExtractor`・
+  `GitWorktreeVcs`・`MermaidRenderer`・`JsonRenderer`)を組み立て、
+  `adapters.mcp.server.create_server()`にファクトリとして渡すだけの薄い殻
+  (cli/main.py・action/main.pyと同じ方針。HQ指摘2)
+- **`design_diff.adapters.mcp`(新しいアダプタパッケージ)**: `mcp`パッケージ
+  (公式Model Context Protocol Python SDK)への依存を閉じ込め、
+  `create_server(use_case_factory)`という1つの関数だけを公開する。
+  `adapters-independence`契約に`design_diff.adapters.mcp`を追加し、
+  extraction/vcs/rendering/githubと同様に他のアダプタから独立させた
+
+**指摘(実装中に発見・自己修正)**: 当初`adapters/mcp/server.py`が
+`ComputeDesignDiffUseCase`(application層)を直接importする実装にしたところ、
+import-linterの`layers`契約(adaptersはapplicationより下位で、上位層に
+依存してはならない)に実際に違反することをCIで検出した。他のアダプタが
+`application.ports`のProtocolをimportせず構造的部分型で満たしているのと
+同じ理由で、ローカルにProtocol(`_ComputeUseCase`/`_DesignDiffResult`)を
+定義し、`ComputeDesignDiffUseCase`という具象クラス名を一切importしない形に
+修正した。§2.2の設計判断がMCPアダプタにもそのまま適用される、という良い
+実例になった。
+
+### 14.2 エラーハンドリング(adapters-independence契約との両立)
+
+CLI/Actionは`Py2pumlExtractionError.friendly_message()`を直接呼んで
+分かりやすいエラー文言を組み立てているが、`adapters.mcp`は
+`design_diff.adapters.extraction`に依存できない(`adapters-independence`
+契約)。そのため、`friendly_message`属性の有無を`hasattr()`で判定する
+duck typingで対応した: 属性があればそれを使い、無ければ`str(error)`に
+フォールバックする。いずれの場合も、MCP SDKの`ToolError`として再送出する
+(SDKの`call_tool()`がこれを「想定内のツールエラー」として扱い、
+そのまま伝播させることを実機で確認済み。想定外の例外は`UnexpectedToolError`
+にラップされる)。
+
+### 14.3 実装で確認した公式SDKの実際のAPI(実機検証)
+
+ドキュメントの記述だけに頼らず、`uv add mcp`で実際にインストールした
+`mcp==2.1.1`のAPIを`help()`で直接確認しながら実装した:
+
+- サーバークラスは`mcp.server.MCPServer`(`FastMCP`という別名ではない。
+  SDKのバージョンによって名称が変わりうるため、実機確認を優先した)
+- `server.add_tool(fn, name=..., structured_output=False)`で、デコレータでは
+  なく**命令的に**ツールを登録できる(依存性注入されたクロージャを登録するため
+  に必要。DesignDiffのファクトリパターンと相性が良い)
+- `structured_output=False`を明示し、JSON文字列をプレーンテキストコンテンツ
+  として返す(構造化出力としてJSON Schema検証をかけない。design-diffの
+  JSON出力は既に自己記述的なスキーマを持つため、二重のスキーマ検証は不要)
+- `await server.call_tool(name, arguments) -> CallToolResult`で、実際に
+  stdioトランスポートを起動せずにインプロセスでツールを呼べる。これを
+  テスト(単体・E2Eとも)に活用し、実際のstdio JSON-RPCフレーミングを
+  モックせずに済んでいる
+- ツール関数は同期(非async)関数のままでよい(`design-diff`のuse case実行は
+  ブロッキングなsubprocess呼び出しであり、async化する必要が無い)
+
+### 14.4 検証
+
+- ユニットテスト(`tests/adapters/mcp/test_server.py`): フェイクのuse case
+  ファクトリを注入し、引数受け渡し・repo_pathの呼び出しごとの独立性・
+  エラーハンドリング(friendly_message有無の両ケース)を検証
+- composition rootのテスト(`tests/mcp/test_main.py`): `_default_use_case_factory`
+  が実際の具象アダプタを正しく組み立てること、`main()`がテスト用の
+  `run_server`フックに正しく委譲すること(既定では`server.run(transport=
+  "stdio")`を呼ぶこと)を検証
+- E2Eテスト: 実際のgit worktree・py2puml・MCP SDKを使い、`call_tool()`経由で
+  `analyze_design_diff`を呼んでクラス追加が検出されることを確認
+  (CLI/Actionの`TestCliEndToEnd`/実PR検証と同じ「MVP完成の証明」の考え方)
+- 手動スモークテスト: `uv run design-diff-mcp`をバックグラウンドで起動し、
+  エラー出力なくstdioで待ち受け続けることを確認してから終了させた
+
+### 14.5 配布・登録
+
+`pyproject.toml`の`[project.scripts]`に`design-diff-mcp = "design_diff.mcp.main:main"`
+を追加。README・AGENTS.mdに、汎用`mcp.json`・Claude Code(`claude mcp add`)・
+Claude Desktopそれぞれの登録手順を追記した(PyPI公開はまだ承認待ちのため、
+現時点では`uv add design-diff`はソース/TestPyPI経由を前提とした案内であり、
+実際にインストール可能になるのはPyPI公開後)。

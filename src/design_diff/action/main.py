@@ -68,19 +68,22 @@ def _default_use_case_factory(repo_path: Path | None, repo_slug: str) -> PostDes
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    # cli/main.pyと同じ理由(2026-08-29の点検)でhelp文言は英語にしている。
+    # design-diff-actionの--helpを直接見るのはワークフローYAMLを手で調整する
+    # 人がほとんどだが、公開インターフェースとしての一貫性を優先した。
     parser = argparse.ArgumentParser(prog="design-diff-action")
-    parser.add_argument("base_ref", help="比較元のgit ref(通常はPRのbase SHA)")
-    parser.add_argument("head_ref", help="比較先のgit ref(通常はPRのhead SHA)")
-    parser.add_argument("--package", required=True, help="解析対象のPythonパッケージ名")
-    parser.add_argument("--pr", type=int, required=True, help="コメント投稿先のPR番号")
-    parser.add_argument("--repo", required=True, help="owner/repo 形式")
+    parser.add_argument("base_ref", help="The ref to compare from (usually the PR's base SHA)")
+    parser.add_argument("head_ref", help="The ref to compare to (usually the PR's head SHA)")
+    parser.add_argument("--package", required=True, help="The importable Python package name to analyze")
+    parser.add_argument("--pr", type=int, required=True, help="The PR number to post the comment to")
+    parser.add_argument("--repo", required=True, help="\"owner/repo\" format")
     parser.add_argument(
-        "--repo-path", type=Path, default=None, help="対象gitリポジトリのパス(既定: カレントディレクトリ)"
+        "--repo-path", type=Path, default=None, help="Path to the git repository to analyze (default: cwd)"
     )
     parser.add_argument(
         "--include-dunder",
         action="store_true",
-        help="ダンダーメソッド(__init__等)も含める(既定: 除外)",
+        help="Also include dunder methods such as __init__ (default: excluded)",
     )
     return parser
 

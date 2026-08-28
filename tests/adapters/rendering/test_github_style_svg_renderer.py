@@ -212,6 +212,66 @@ class TestGitHubStyleSvgRendererNamespaces:
         assert ">pkg.models<" in output
 
 
+class TestGitHubStyleSvgRendererWarnings:
+    """発見した問題(2026-08-29の「自己説明的か点検」): PRコメントに実際に埋め込まれる
+    画像(--format svgの既定)には`diff.warnings`が表示されておらず、Mermaidの
+    `<details>`フォールバックを開かない限りレビュアーが部分解析に気付けなかった。
+    沈黙原則(§4.1, §7.1)を毒す抜け穴だったため、SVG本体にも警告バナーを追加した。
+    """
+
+    def test_no_warnings_banner_when_warnings_is_empty(self):
+        output = GitHubStyleSvgRenderer().render(EMPTY_DIFF)
+        assert "could not be analyzed" not in output
+
+    def test_warnings_banner_lists_skipped_module_count_and_names(self):
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",))
+
+        output = GitHubStyleSvgRenderer().render(diff)
+
+        assert "1 module(s) could not be analyzed" in output
+        assert "pkg.broken" in output
+
+    def test_warnings_banner_lists_every_skipped_module(self):
+        diff = SnapshotDiff(
+            classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.a_broken", "pkg.b_broken")
+        )
+
+        output = GitHubStyleSvgRenderer().render(diff)
+
+        assert "2 module(s) could not be analyzed" in output
+        assert "pkg.a_broken" in output
+        assert "pkg.b_broken" in output
+
+    def test_warnings_banner_appears_even_when_there_are_no_class_changes(self):
+        """『変更なしに見えるが解析は部分的』の場合でも、有効なSVGが出ること。"""
+        diff = SnapshotDiff(classes=ClassDiff(), relations=RelationDiff(), warnings=("pkg.broken",))
+
+        output = GitHubStyleSvgRenderer().render(diff)
+
+        assert output.startswith("<svg")
+        assert output.endswith("</svg>")
+        assert "pkg.broken" in output
+
+    def test_class_boxes_are_shifted_below_the_warnings_banner(self):
+        """バナーの分だけ既存コンテンツが下にずれ、重ならないこと。"""
+        cls = make_class("pkg.models.Battery", attributes=(AttributeIR(name="x", type="int"),))
+        diff_without_warnings = SnapshotDiff(classes=ClassDiff(added=(cls,)), relations=RelationDiff())
+        diff_with_warnings = SnapshotDiff(
+            classes=ClassDiff(added=(cls,)), relations=RelationDiff(), warnings=("pkg.broken",)
+        )
+
+        without = GitHubStyleSvgRenderer().render(diff_without_warnings)
+        with_warnings = GitHubStyleSvgRenderer().render(diff_with_warnings)
+
+        def svg_height(svg: str) -> int:
+            import re
+
+            return int(re.search(r'height="(\d+)"', svg).group(1))
+
+        assert svg_height(with_warnings) > svg_height(without)
+        assert '<g transform="translate(0,' in with_warnings
+
+
 class TestGitHubStyleSvgRendererEscaping:
     def test_special_characters_in_type_names_are_escaped(self):
         """未解決の型名などに"<"/">"/"&"が紛れ込んでもSVG構文が壊れないこと。"""

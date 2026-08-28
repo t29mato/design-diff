@@ -46,11 +46,6 @@ class FailingComputeUseCase:
         raise self._error
 
 
-class ErrorWithFriendlyMessage(RuntimeError):
-    def friendly_message(self) -> str:
-        return "friendly explanation"
-
-
 def call(server, arguments: dict):
     return asyncio.run(server.call_tool(TOOL_NAME, arguments))
 
@@ -143,18 +138,36 @@ class TestAnalyzeDesignDiffToolCallsUseCase:
 
 
 class TestAnalyzeDesignDiffToolErrorHandling:
-    def test_raises_tool_error_with_friendly_message_when_available(self):
-        server = create_server(lambda repo_path: FailingComputeUseCase(ErrorWithFriendlyMessage("boom")))
+    """MCPツール自体の説明文(docstring)は英語なので、エラー文言も英語で
+    自己説明的である必要がある(2026-08-29の点検で発見・修正。§14.6参照)。
+    """
 
-        with pytest.raises(ToolError) as exc_info:
-            call(server, {"base_ref": "main", "head_ref": "feature", "package": "pkg"})
-
-        assert "friendly explanation" in str(exc_info.value)
-
-    def test_raises_tool_error_with_str_of_exception_when_no_friendly_message(self):
+    def test_raises_a_generic_english_tool_error_for_a_plain_failure(self):
         server = create_server(lambda repo_path: FailingComputeUseCase(RuntimeError("plain failure")))
 
         with pytest.raises(ToolError) as exc_info:
             call(server, {"base_ref": "main", "head_ref": "feature", "package": "pkg"})
 
-        assert "plain failure" in str(exc_info.value)
+        message = str(exc_info.value)
+        assert "Analysis failed" in message
+        assert "plain failure" in message  # 元の例外テキストも詳細として残す
+
+    def test_adds_a_missing_dependency_hint_for_module_not_found_error(self):
+        error = RuntimeError("worker failed: ModuleNotFoundError: No module named 'idna'")
+        server = create_server(lambda repo_path: FailingComputeUseCase(error))
+
+        with pytest.raises(ToolError) as exc_info:
+            call(server, {"base_ref": "main", "head_ref": "feature", "package": "pkg"})
+
+        message = str(exc_info.value)
+        assert "missing dependency" in message
+        assert "not a bug in design-diff itself" in message
+
+    def test_adds_a_missing_dependency_hint_for_import_error(self):
+        error = RuntimeError("worker failed: ImportError: cannot import name 'x'")
+        server = create_server(lambda repo_path: FailingComputeUseCase(error))
+
+        with pytest.raises(ToolError) as exc_info:
+            call(server, {"base_ref": "main", "head_ref": "feature", "package": "pkg"})
+
+        assert "missing dependency" in str(exc_info.value)

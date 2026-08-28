@@ -1,5 +1,11 @@
 """MermaidCliSvgRenderer。HQ追加要件: ローカルCLI向けSVG直接出力(MVP+)。
 
+**2026-08-25時点の位置づけ(HQ #36/#38対応後)**: `--format svg`の既定は
+`GitHubStyleSvgRenderer`(mermaid非依存のネイティブSVGレンダラー)に切り替わって
+おり、このモジュールが対象とするのは`--format svg-mermaid`(旧実装、要
+mermaid-cli)のみになった。以下のコメントは元々`--format svg`が本レンダラー
+だった時点のもので、経緯として残している。
+
 GitHubのPRコメントはMermaidをネイティブ描画するが、ローカルでCLIを使う開発者は
 そのままではプレビューできない。ローカルでも「絵」で確認できるよう、既に
 Mermaidテキストとしてレンダリング済みの出力(MermaidRendererの結果)を
@@ -24,7 +30,9 @@ import tempfile
 from pathlib import Path
 
 _INSTALL_HELP = (
-    "SVG出力にはmermaid-cli (mmdc) が必要です。次のいずれかをお試しください:\n"
+    "--format svg-mermaid にはmermaid-cli (mmdc) が必要です"
+    "(GitHub diff風のネイティブSVGが欲しいだけなら、mermaid-cli不要の"
+    "--format svg(既定)を使ってください)。次のいずれかをお試しください:\n"
     "  npm install -g @mermaid-js/mermaid-cli\n"
     "  npx @mermaid-js/mermaid-cli -i input.mmd -o output.svg  (一度だけ試す場合)\n"
     "インストールせずに確認したい場合は、Mermaidテキストを"

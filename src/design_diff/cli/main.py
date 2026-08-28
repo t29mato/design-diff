@@ -34,34 +34,39 @@ def _default_use_case_factory(repo_path: Path | None) -> ComputeDesignDiffUseCas
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    # `--help`はdesign-diffを試す誰もが最初に見るテキストであり、READMEと同じ
+    # 英語ファーストの公開インターフェースだと判断した(内部の設計コメントは
+    # 引き続き日本語だが、argparseのhelp文言はここで英語に揃えた。
+    # 2026-08-29の「自己説明的か点検」で発見・修正)。
     parser = argparse.ArgumentParser(prog="design-diff")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     diff_parser = subparsers.add_parser(
-        "diff", help="base_refとhead_refの間のクラス構造diffをMermaid/JSONで出力する"
+        "diff", help="Show the class-level structure diff between base_ref and head_ref"
     )
-    diff_parser.add_argument("base_ref", help="比較元のgit ref(ブランチ・タグ・コミット)")
-    diff_parser.add_argument("head_ref", help="比較先のgit ref")
-    diff_parser.add_argument("--package", required=True, help="解析対象のPythonパッケージ名")
+    diff_parser.add_argument("base_ref", help="The ref to compare from (branch, tag, or commit)")
+    diff_parser.add_argument("head_ref", help="The ref to compare to")
+    diff_parser.add_argument("--package", required=True, help="The importable Python package name to analyze")
     diff_parser.add_argument(
         "--format",
         choices=["mermaid", "json", "svg", "svg-mermaid"],
         default="mermaid",
         help=(
-            "出力形式(既定: mermaid)。svgはGitHub diff風のネイティブSVG(外部依存なし、"
-            "メンバー単位の増減を色分けで表示。HQ #36/#38)。svg-mermaidは旧来の"
-            "mermaid-cli経由の変換(要mermaid-cli、メンバー単位の色分けは無い)。"
-            "GitHub PRコメントはmermaidブロックをネイティブ描画するのでActionからは"
-            "mermaid/jsonで十分"
+            "Output format (default: mermaid). svg is design-diff's native "
+            "GitHub-diff-style SVG (no external dependencies, colors changed "
+            "members line by line). svg-mermaid is the legacy mermaid-cli "
+            "conversion (requires mermaid-cli, no member-level coloring). "
+            "GitHub Action PR comments render mermaid natively, so mermaid/json "
+            "are enough there"
         ),
     )
     diff_parser.add_argument(
-        "--repo", type=Path, default=None, help="対象gitリポジトリのパス(既定: カレントディレクトリ)"
+        "--repo", type=Path, default=None, help="Path to the git repository to analyze (default: cwd)"
     )
     diff_parser.add_argument(
         "--include-dunder",
         action="store_true",
-        help="ダンダーメソッド(__init__等)も含める(既定: 除外。表示ノイズ削減のため)",
+        help="Also include dunder methods such as __init__ (default: excluded, to reduce noise)",
     )
 
     return parser

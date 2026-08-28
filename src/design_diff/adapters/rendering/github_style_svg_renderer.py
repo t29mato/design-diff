@@ -63,6 +63,12 @@ _GUTTER_COLOR = {"added": "#1a7f37", "removed": "#cf222e", "changed": "#9a6700",
 _RELATION_COLOR = {True: "#1a7f37", False: "#cf222e"}
 _RELATION_LABEL = {True: "new", False: "removed"}
 
+# 警告バナー(diff.warnings)の配色。「変更」と同じ黄系(_LINE_BG["changed"]/
+# _GUTTER_COLOR["changed"]と統一)。
+_WARNING_BG = "#fff8c5"
+_WARNING_BORDER = "#9a6700"
+_WARNING_TEXT = "#7d4e00"
+
 
 def _escape(text: str) -> str:
     return html.escape(text, quote=True)
@@ -380,6 +386,56 @@ def _build_defs(boxes: dict[str, _ClassBox], clip_ids: dict[str, str]) -> list[s
     return parts
 
 
+def _warnings_banner_height(warnings: tuple[str, ...]) -> float:
+    if not warnings:
+        return 0.0
+    return _PADDING * 2 + _LINE_HEIGHT * (1 + len(warnings)) + _PADDING
+
+
+def _warnings_banner_width(warnings: tuple[str, ...]) -> float:
+    """バナーの文言(モジュール名を含む)がクラスボックスの並びより横幅を要求する
+    場合があるため、必要な幅を概算する(_measure()と同じ文字幅ヒューリスティック)。
+    """
+    if not warnings:
+        return 0.0
+    header = f"⚠ {len(warnings)} module(s) could not be analyzed (import failed):"
+    lines = [header, *(f"  - {name}" for name in warnings)]
+    max_chars = max(len(line) for line in lines)
+    return 2 * _PADDING + max_chars * _CHAR_WIDTH
+
+
+def _render_warnings_banner(warnings: tuple[str, ...], width: float) -> list[str]:
+    """`diff.warnings`(サブモジュールのimport失敗)を、図の一番上に警告バナー
+    として描画する。
+
+    2026-08-29の「自己説明的か点検」で発見: この警告はMermaid出力のnoteには
+    既にあったが(architecture.md §7.1)、PRコメントに実際に埋め込まれる画像
+    (GitHubStyleSvgRenderer、`--format svg`の既定)には表示されていなかった。
+    Mermaidブロックは`<details>`内の折りたたまれたフォールバックに追いやられて
+    いるため、レビュアーが最初に見る画像だけでは部分解析であることに気付けない
+    ――沈黙原則(§4.1, §7.1)を毒す抜け穴になっていた。この関数でその抜け穴を塞ぐ。
+
+    このバナーの文言は英語にしている(§14.6で決めた「PRコメントに埋め込まれる
+    公開向けの文言は英語」という方針を、SVG本体にも一貫して適用する)。
+    """
+    height = _warnings_banner_height(warnings)
+    lines = [f"⚠ {len(warnings)} module(s) could not be analyzed (import failed):"]
+    lines.extend(f"  - {name}" for name in warnings)
+
+    parts = [
+        f'<rect x="0" y="0" width="{width:.0f}" height="{height:.0f}" '
+        f'fill="{_WARNING_BG}" stroke="{_WARNING_BORDER}" stroke-width="1.5" rx="4"/>'
+    ]
+    y = _PADDING + _LINE_HEIGHT * 0.7
+    for line in lines:
+        parts.append(
+            f'<text x="{_PADDING:.1f}" y="{y:.1f}" font-family="{_FONT_STACK}" font-size="12" '
+            f'font-weight="bold" fill="{_WARNING_TEXT}">{_escape(line)}</text>'
+        )
+        y += _LINE_HEIGHT
+    return parts
+
+
 class GitHubStyleSvgRenderer:
     """SnapshotDiffから、mermaid非依存の自己完結SVGを直接生成する。RendererPortを満たす。"""
 
@@ -388,14 +444,25 @@ class GitHubStyleSvgRenderer:
     ) -> str:
         del mermaid, meta  # このレンダラーはSnapshotDiffのみから完結してレンダリングする
         boxes = _collect_boxes(diff)
-        total_width, total_height, namespace_bands = _layout(boxes)
+        layout_width, layout_height, namespace_bands = _layout(boxes)
         clip_ids = {fqn: f"box-clip-{i}" for i, fqn in enumerate(boxes)}
+
+        banner_height = _warnings_banner_height(diff.warnings)
+        total_width = max(layout_width, _warnings_banner_width(diff.warnings))
+        total_height = layout_height + banner_height
 
         parts: list[str] = [
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{total_width:.0f}" height="{total_height:.0f}" '
             f'viewBox="0 0 {total_width:.0f} {total_height:.0f}" font-family="{_FONT_STACK}">',
             '<rect width="100%" height="100%" fill="#ffffff"/>',
         ]
+        if diff.warnings:
+            parts.extend(_render_warnings_banner(diff.warnings, total_width))
+
+        # 警告バナーの高さぶん、以降のコンテンツ全体を下にずらす(既存の
+        # レイアウト計算(_layout/_collect_boxes)には一切手を入れず、
+        # <g transform>で座標系だけをずらす)。
+        parts.append(f'<g transform="translate(0, {banner_height:.1f})">')
         parts.extend(_build_defs(boxes, clip_ids))
 
         for namespace, top, right, bottom in namespace_bands:
@@ -419,5 +486,6 @@ class GitHubStyleSvgRenderer:
         for relation in diff.relations.removed:
             parts.extend(_render_relation(relation, boxes, added=False))
 
+        parts.append("</g>")
         parts.append("</svg>")
         return "".join(parts)

@@ -112,20 +112,6 @@ notification floods) and stays silent when nothing structural changed.
 - **Diagram shows no dependency edges**: the analyzed classes likely lack
   type annotations on attributes / `__init__` parameters.
 
-### Automating this with an agent skill
-
-[SKILL.md](./SKILL.md) packages steps 2–4 above as an agent skill. Install it
-into any [vercel-labs/skills](https://github.com/vercel-labs/skills)-compatible
-agent (Claude Code, Cursor, opencode, etc.) with:
-
-```bash
-npx skills add t29mato/design-diff
-```
-
-Or, for direct Claude Code use without the installer, copy
-[.claude/skills/enable-design-diff/](./.claude/skills/enable-design-diff/)
-into the target repository's own `.claude/skills/`.
-
 ---
 
 ## Part 2: Registering the MCP server

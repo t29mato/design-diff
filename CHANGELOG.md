@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **skillsエコシステムへの登録をやめた(オーナー判断)。** ルートの
+  `SKILL.md`・`.claude/skills/enable-design-diff/`・llms.txt/AGENTS.mdの
+  `npx skills add t29mato/design-diff`関連の記述をすべて撤去した。主導線は
+  MCPサーバー・README・GitHub Actionのまま(いずれも変更していない)。
+  `.gitignore`の`.claude/skills/`例外も元に戻した(`.claude/`を再び丸ごと
+  無視する)
+
 HQ指示: 公開承認待ちの間のLLMO/発見可能性の仕上げ(2026-08-29)。
 「既存の警告・エラーメッセージが自己説明的か点検」で、1件のバグと複数の
 一貫性の欠如を発見・修正した。

@@ -5,6 +5,47 @@
 
 ## [Unreleased]
 
+PyPI公開readiness点検(HQ指示、オーナー最終確認待ち。タグ・publish承認自体は
+まだ実行していない)で発見・修正した項目:
+
+### Fixed(公開readiness点検)
+
+- **READMEのヒーロー画像2枚が相対パス(`./docs/images/...`)だったため、
+  PyPIのプロジェクトページでは壊れて表示される状態だった。** PyPIは
+  READMEをGitHubと別ドメインでレンダリングするため、相対パスの画像は
+  解決できない(一次情報で確認済み)。`raw.githubusercontent.com`の絶対URL
+  に変更した。同様に`./AGENTS.md`/`./LICENSE`への相対リンクも絶対URLに変更
+- `pyproject.toml`の`description`が、SVGネイティブレンダラー・MCPサーバー
+  以前(Mermaid中心だった頃)の説明文のまま古くなっていたため更新した
+  (PyPI検索結果・プロジェクト一覧に表示される文言のため)
+- `keywords`に`mcp`/`model-context-protocol`を追加した(MCPサーバーという
+  新機能のPyPI検索での発見可能性のため)
+
+### Verification(公開readiness点検で実施)
+
+- パッケージ名`design-diff`がPyPIで未使用であることを、PEP 503 Simple Index
+  (`pypi.org/simple/design-diff/`)への直接アクセスで確認した(`pypi.org/
+  project/design-diff/`は bot対策のチャレンジページを返すため、そちらでは
+  判定できなかった)
+- `uv build`でsdist/wheelを実際に生成し、`twine check`でPASSEDを確認。
+  中身を検査し、`demo_shop/`・`tests/`・`docs/design/spikes/`等が含まれず
+  `src/design_diff/`のみが同梱されていることを確認した
+- 生成したwheelをクリーンな仮想環境に実際にpip installし、`design-diff`
+  CLI(`--help`・`--format svg`)と`design-diff-mcp`(MCPサーバー、実際の
+  `analyze_design_diff`呼び出しでクラス追加を検出)の両方が動作することを
+  確認した
+
+### 未対応のまま残した項目(要オーナー判断)
+
+- **バージョン番号の不整合**: `pyproject.toml`は現在`0.3.0`のままだが、
+  `v0.3.0`タグ以降に10個のコミット(MCPサーバーという新機能を含む)が
+  mainに積まれている。SemVerに従うなら後方互換な新機能の追加は**マイナー
+  バージョンアップ**にあたるため、公開前に`0.4.0`への版上げを推奨する。
+  CHANGELOGの本`[Unreleased]`セクションも、版上げに合わせて`[0.4.0]`
+  として正式なセクションに切り出す必要がある。バージョン番号自体の決定・
+  CHANGELOGの版セクション化・タグ作成は、今回はワーカー側で実施せず
+  オーナー最終確認を経た上でHQが実行する対象として保留した
+
 ### Removed
 
 - **skillsエコシステムへの登録をやめた(オーナー判断)。** ルートの

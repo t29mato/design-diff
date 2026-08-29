@@ -2,9 +2,9 @@
 
 **See what a pull request does to your architecture — classes, members, and dependencies — as a GitHub-style diff, rendered as one picture in the PR comment.**
 
-![design-diff output: a class diagram where added members are green rows with a + gutter, removed members are red rows with strikethrough, and a new dependency is drawn as a labeled green edge](./docs/images/shop-discount-codes.svg)
+![design-diff output: a class diagram where added members are green rows with a + gutter, removed members are red rows with strikethrough, and a new dependency is drawn as a labeled green edge](https://raw.githubusercontent.com/t29mato/design-diff/main/docs/images/shop-discount-codes.svg)
 
-![The same diagram as it actually renders inside a live GitHub pull request comment](./docs/images/pr-comment-live-demo.png)
+![The same diagram as it actually renders inside a live GitHub pull request comment](https://raw.githubusercontent.com/t29mato/design-diff/main/docs/images/pr-comment-live-demo.png)
 *This is a real PR comment, not a mockup — click through: [sample PR #8](https://github.com/t29mato/design-diff/pull/8).*
 
 A 500-line diff tells you *how much* changed. design-diff tells you *what* changed: which classes appeared or disappeared, which properties and methods were added or removed inside each class, and which dependencies grew between them. Added members are green rows with a `+` gutter, removed members are red rows with strikethrough — the same visual language as the code diff you already read every day.
@@ -85,7 +85,7 @@ Register it with your MCP client by pointing it at the `design-diff-mcp` command
 }
 ```
 
-`cwd` is the repository to analyze (`repo_path` can also be passed per-call as a tool argument to override it). See [AGENTS.md](./AGENTS.md) for client-specific registration steps (Claude Code, Claude Desktop, etc.).
+`cwd` is the repository to analyze (`repo_path` can also be passed per-call as a tool argument to override it). See [AGENTS.md](https://github.com/t29mato/design-diff/blob/main/AGENTS.md) for client-specific registration steps (Claude Code, Claude Desktop, etc.).
 
 ## How it works
 
@@ -101,4 +101,4 @@ design-diff checks out both refs into temporary worktrees, imports the package i
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](https://github.com/t29mato/design-diff/blob/main/LICENSE)

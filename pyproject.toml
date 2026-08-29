@@ -1,7 +1,7 @@
 [project]
 name = "design-diff"
 version = "0.3.0"
-description = "Class-level structure diff for Python PRs: Mermaid classDiagram + JSON, for humans and AI reviewers."
+description = "See what a pull request does to your Python architecture — a GitHub-diff-style class diagram in the PR comment, plus JSON and an MCP server for AI reviewers."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -18,6 +18,8 @@ keywords = [
     "pull-request",
     "diff",
     "ai-reviewer",
+    "mcp",
+    "model-context-protocol",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
